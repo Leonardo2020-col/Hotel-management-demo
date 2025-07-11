@@ -1,16 +1,9 @@
 // src/components/auth/BranchSelector.jsx
 import React, { useState } from 'react';
-import { 
-  Building2, 
-  MapPin, 
-  Users, 
-  Bed,
-  ArrowRight,
-  CheckCircle
-} from 'lucide-react';
+import { Building2, MapPin, Users, Check, ArrowRight } from 'lucide-react';
 import Button from '../common/Button';
 
-const BranchSelector = ({ onBranchSelect, loading = false }) => {
+const BranchSelector = ({ onBranchSelect, loading }) => {
   const [selectedBranch, setSelectedBranch] = useState(null);
 
   // Datos mock de sucursales
@@ -19,42 +12,44 @@ const BranchSelector = ({ onBranchSelect, loading = false }) => {
       id: 1,
       name: 'Hotel Paraíso - Centro',
       location: 'San Isidro, Lima',
-      rooms: 45,
-      currentGuests: 32,
-      occupancyRate: 71,
+      address: 'Av. Conquistadores 123, San Isidro',
+      capacity: '120 habitaciones',
       status: 'active',
-      image: '/api/placeholder/300/200',
-      features: ['WiFi Gratuito', 'Restaurante', 'Spa', 'Piscina'],
-      description: 'Nuestra sucursal principal en el corazón de San Isidro'
+      description: 'Sucursal principal en el distrito financiero'
     },
     {
       id: 2,
       name: 'Hotel Paraíso - Miraflores',
       location: 'Miraflores, Lima',
-      rooms: 60,
-      currentGuests: 48,
-      occupancyRate: 80,
+      address: 'Av. Larco 456, Miraflores',
+      capacity: '80 habitaciones',
       status: 'active',
-      image: '/api/placeholder/300/200',
-      features: ['Vista al Mar', 'Centro de Negocios', 'Gimnasio', 'Bar'],
-      description: 'Ubicación privilegiada con vista al malecón de Miraflores'
+      description: 'Vista al océano y zona turística'
     },
     {
       id: 3,
       name: 'Hotel Paraíso - Aeropuerto',
       location: 'Callao, Lima',
-      rooms: 35,
-      currentGuests: 28,
-      occupancyRate: 80,
+      address: 'Av. Faucett 789, Callao',
+      capacity: '60 habitaciones',
       status: 'active',
-      image: '/api/placeholder/300/200',
-      features: ['Shuttle Gratuito', 'Check-in 24h', 'Business Center'],
-      description: 'Ideal para viajeros de negocios y conexiones'
+      description: 'Conveniente para viajeros de negocios'
+    },
+    {
+      id: 4,
+      name: 'Hotel Paraíso - Barranco',
+      location: 'Barranco, Lima',
+      address: 'Jr. Unión 321, Barranco',
+      capacity: '45 habitaciones',
+      status: 'maintenance',
+      description: 'Zona bohemia y cultural (en mantenimiento)'
     }
   ];
 
-  const handleBranchSelect = (branch) => {
-    setSelectedBranch(branch);
+  const handleBranchClick = (branch) => {
+    if (branch.status === 'active') {
+      setSelectedBranch(branch);
+    }
   };
 
   const handleContinue = () => {
@@ -63,136 +58,121 @@ const BranchSelector = ({ onBranchSelect, loading = false }) => {
     }
   };
 
-  const getOccupancyColor = (rate) => {
-    if (rate >= 80) return 'text-green-600 bg-green-100';
-    if (rate >= 60) return 'text-yellow-600 bg-yellow-100';
-    return 'text-red-600 bg-red-100';
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl">
+      <div className="w-full max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
             <Building2 className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Seleccionar Sucursal</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Selecciona tu Sucursal
+          </h1>
           <p className="text-gray-600">
-            Elige la sucursal que deseas administrar
+            Como administrador, necesitas seleccionar la sucursal que vas a gestionar
           </p>
         </div>
 
-        {/* Branch Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {branches.map((branch) => (
-            <div
-              key={branch.id}
-              className={`relative bg-white rounded-2xl shadow-lg border-2 transition-all duration-200 cursor-pointer hover:shadow-xl ${
-                selectedBranch?.id === branch.id
-                  ? 'border-blue-500 ring-2 ring-blue-200'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              onClick={() => handleBranchSelect(branch)}
-            >
-              {/* Selection Indicator */}
-              {selectedBranch?.id === branch.id && (
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4 text-white" />
-                </div>
-              )}
-
-              <div className="p-6">
-                {/* Branch Image Placeholder */}
-                <div className="w-full h-32 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg mb-4 flex items-center justify-center">
-                  <Building2 className="w-12 h-12 text-white" />
-                </div>
-
-                {/* Branch Info */}
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  {branch.name}
-                </h3>
-                
-                <div className="flex items-center text-gray-600 mb-3">
-                  <MapPin className="w-4 h-4 mr-2" />
-                  <span className="text-sm">{branch.location}</span>
-                </div>
-
-                <p className="text-gray-600 text-sm mb-4">
-                  {branch.description}
-                </p>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Bed className="w-4 h-4 text-gray-500 mr-1" />
-                      <span className="text-lg font-semibold text-gray-900">
-                        {branch.rooms}
-                      </span>
+        {/* Sucursales Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {branches.map((branch) => {
+            const isSelected = selectedBranch?.id === branch.id;
+            const isDisabled = branch.status !== 'active';
+            
+            return (
+              <div
+                key={branch.id}
+                onClick={() => handleBranchClick(branch)}
+                className={`
+                  relative bg-white rounded-2xl shadow-lg border-2 p-6 transition-all duration-200 cursor-pointer
+                  ${isSelected 
+                    ? 'border-blue-500 shadow-xl scale-105' 
+                    : isDisabled 
+                      ? 'border-gray-200 opacity-50 cursor-not-allowed'
+                      : 'border-gray-200 hover:border-gray-300 hover:shadow-xl'
+                  }
+                `}
+              >
+                {/* Status indicator */}
+                <div className="absolute top-4 right-4">
+                  {isSelected && (
+                    <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-xs text-gray-500">Habitaciones</span>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Users className="w-4 h-4 text-gray-500 mr-1" />
-                      <span className="text-lg font-semibold text-gray-900">
-                        {branch.currentGuests}
-                      </span>
+                  )}
+                  {isDisabled && (
+                    <div className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                      Mantenimiento
                     </div>
-                    <span className="text-xs text-gray-500">Huéspedes</span>
-                  </div>
+                  )}
                 </div>
 
-                {/* Occupancy Rate */}
+                {/* Branch icon */}
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${
+                  isSelected 
+                    ? 'bg-blue-100' 
+                    : isDisabled 
+                      ? 'bg-gray-100' 
+                      : 'bg-gray-100'
+                }`}>
+                  <Building2 className={`w-6 h-6 ${
+                    isSelected 
+                      ? 'text-blue-600' 
+                      : isDisabled 
+                        ? 'text-gray-400' 
+                        : 'text-gray-600'
+                  }`} />
+                </div>
+
+                {/* Branch info */}
                 <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-600">Ocupación</span>
-                    <span className={`text-sm px-2 py-1 rounded-full ${getOccupancyColor(branch.occupancyRate)}`}>
-                      {branch.occupancyRate}%
-                    </span>
+                  <h3 className={`text-xl font-bold mb-2 ${
+                    isDisabled ? 'text-gray-400' : 'text-gray-900'
+                  }`}>
+                    {branch.name}
+                  </h3>
+                  <p className={`text-sm mb-3 ${
+                    isDisabled ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    {branch.description}
+                  </p>
+                </div>
+
+                {/* Branch details */}
+                <div className="space-y-2">
+                  <div className="flex items-center text-sm text-gray-500">
+                    <MapPin className="w-4 h-4 mr-2" />
+                    <span>{branch.address}</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${branch.occupancyRate}%` }}
-                    />
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Users className="w-4 h-4 mr-2" />
+                    <span>{branch.capacity}</span>
                   </div>
                 </div>
 
-                {/* Features */}
-                <div className="space-y-1">
-                  <span className="text-sm font-medium text-gray-700">Servicios:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {branch.features.slice(0, 3).map((feature, index) => (
-                      <span
-                        key={index}
-                        className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded"
-                      >
-                        {feature}
-                      </span>
-                    ))}
-                    {branch.features.length > 3 && (
-                      <span className="text-xs text-gray-500">
-                        +{branch.features.length - 3} más
-                      </span>
-                    )}
+                {/* Selection indicator */}
+                {isSelected && (
+                  <div className="mt-4 pt-4 border-t border-blue-100">
+                    <div className="flex items-center text-blue-600 text-sm font-medium">
+                      <Check className="w-4 h-4 mr-2" />
+                      Sucursal seleccionada
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-center space-x-4">
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button
             variant="outline"
-            onClick={() => window.history.back()}
+            onClick={() => window.location.href = '/login'}
             disabled={loading}
           >
-            Cancelar
+            Volver al Login
           </Button>
           
           <Button
@@ -203,32 +183,17 @@ const BranchSelector = ({ onBranchSelect, loading = false }) => {
             icon={ArrowRight}
             className="px-8"
           >
-            {loading ? 'Configurando...' : 'Continuar'}
+            {loading ? 'Configurando acceso...' : 'Continuar al Dashboard'}
           </Button>
         </div>
 
-        {/* Selected Branch Summary */}
-        {selectedBranch && (
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-semibold text-blue-900 mb-2">
-              Sucursal Seleccionada:
-            </h4>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-800 font-medium">{selectedBranch.name}</p>
-                <p className="text-blue-600 text-sm">{selectedBranch.location}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-blue-800 text-sm">
-                  {selectedBranch.currentGuests}/{selectedBranch.rooms} ocupadas
-                </p>
-                <p className="text-blue-600 text-sm">
-                  {selectedBranch.occupancyRate}% ocupación
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Help text */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-500">
+            Esta selección determina qué datos y configuraciones verás en el sistema.
+            Puedes cambiar de sucursal más tarde desde el panel de administración.
+          </p>
+        </div>
       </div>
     </div>
   );

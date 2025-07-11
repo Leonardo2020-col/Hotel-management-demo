@@ -24,6 +24,7 @@
     "yup": "^1.6.1"
   },
   "scripts": {
+    "generate": "node generate-structure.js",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

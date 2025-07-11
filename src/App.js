@@ -1,9 +1,9 @@
-// src/App.js - ACTUALIZADO CON SELECCIÓN DE SUCURSAL
+// src/App.js - APLICACIÓN COMPLETA CON TODAS LAS FUNCIONALIDADES
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
-// Import adicional
+// Importar iconos para componentes inline
 import { Shield, Building2 } from 'lucide-react';
 
 // Context Providers
@@ -22,6 +22,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import CheckIn from './pages/CheckIn/CheckIn';
 import Reservations from './pages/Reservations/Reservations';
 import Guests from './pages/Guests/Guests';
+import Reception from './pages/Reception/Reception';
 import Rooms from './pages/Rooms/Rooms';
 import Supplies from './pages/Supplies/Supplies';
 import Reports from './pages/Reports/Reports';
@@ -83,7 +84,7 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Componente para redirección automática según el rol (ACTUALIZADO)
+// Componente para redirección automática según el rol
 const RoleBasedRedirect = () => {
   const { user, hasPermission, isReady } = useAuth();
   
@@ -144,7 +145,7 @@ const PermissionRoute = ({ children, permission }) => {
 
 // Componente principal de rutas
 const AppRoutes = () => {
-  const { isAuthenticated, loading, needsBranchSelection, user } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -191,10 +192,10 @@ const AppRoutes = () => {
                 {/* Ruta raíz con redirección automática según rol */}
                 <Route path="/" element={<RoleBasedRedirect />} />
                 
-                {/* Dashboard */}
+                {/* Dashboard - Acceso para todos */}
                 <Route path="/dashboard" element={<Dashboard />} />
                 
-                {/* Check In */}
+                {/* Check In - Solo para recepción */}
                 <Route 
                   path="/checkin" 
                   element={
@@ -204,7 +205,17 @@ const AppRoutes = () => {
                   } 
                 />
                 
-                {/* Reservations */}
+                {/* Reception - Solo para recepción */}
+                <Route 
+                  path="/reception" 
+                  element={
+                    <PermissionRoute permission="checkin">
+                      <Reception />
+                    </PermissionRoute>
+                  } 
+                />
+                
+                {/* Reservations - Solo para recepción */}
                 <Route 
                   path="/reservations" 
                   element={
@@ -214,11 +225,47 @@ const AppRoutes = () => {
                   } 
                 />
                 
-                <Route path="/guests" element={<Guests />} />
-                <Route path="/rooms" element={<Rooms />} />
-                <Route path="/supplies" element={<Supplies />} />
-                <Route path="/reports" element={<Reports />} />
+                {/* Guests - Acceso para todos */}
+                <Route 
+                  path="/guests" 
+                  element={
+                    <PermissionRoute permission="guests">
+                      <Guests />
+                    </PermissionRoute>
+                  } 
+                />
                 
+                {/* Rooms - Acceso para todos */}
+                <Route 
+                  path="/rooms" 
+                  element={
+                    <PermissionRoute permission="rooms">
+                      <Rooms />
+                    </PermissionRoute>
+                  } 
+                />
+                
+                {/* Supplies - Acceso para todos */}
+                <Route 
+                  path="/supplies" 
+                  element={
+                    <PermissionRoute permission="supplies">
+                      <Supplies />
+                    </PermissionRoute>
+                  } 
+                />
+                
+                {/* Reports - Acceso para todos */}
+                <Route 
+                  path="/reports" 
+                  element={
+                    <PermissionRoute permission="reports">
+                      <Reports />
+                    </PermissionRoute>
+                  } 
+                />
+                
+                {/* Settings - Solo para administradores */}
                 <Route 
                   path="/settings" 
                   element={
@@ -245,6 +292,7 @@ function App() {
       <AuthProvider>
         <ReceptionProvider>
           <div className="App">
+            {/* Toast notifications */}
             <Toaster 
               position="top-right"
               toastOptions={{
@@ -253,9 +301,20 @@ function App() {
                   background: '#363636',
                   color: '#fff',
                 },
+                success: {
+                  style: {
+                    background: '#10b981',
+                  },
+                },
+                error: {
+                  style: {
+                    background: '#ef4444',
+                  },
+                },
               }}
             />
             
+            {/* Main Application Routes */}
             <AppRoutes />
           </div>
         </ReceptionProvider>
