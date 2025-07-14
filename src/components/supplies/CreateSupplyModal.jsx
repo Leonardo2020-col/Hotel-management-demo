@@ -259,7 +259,7 @@ const CreateSupplyModal = ({ isOpen, onClose, onSubmit, categories, suppliers })
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Descripción *
+                Descripción <span className="text-gray-500">(opcional)</span>
               </label>
               <textarea
                 {...register('description')}
