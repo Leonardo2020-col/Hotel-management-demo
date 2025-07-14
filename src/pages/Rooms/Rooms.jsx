@@ -46,7 +46,7 @@ const Rooms = () => {
   // Configuración de tabs
   const tabs = [
     { id: 'rooms', label: 'Habitaciones', icon: Calendar },
-    { id: 'cleaning', label: 'Gestión de Limpieza', icon: Sparkles }
+    //{ id: 'cleaning', label: 'Gestión de Limpieza', icon: Sparkles }
   ];
 
   // Handlers
