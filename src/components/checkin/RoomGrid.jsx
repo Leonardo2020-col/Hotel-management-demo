@@ -1,4 +1,4 @@
-// src/components/checkin/RoomGrid.jsx - ACTUALIZADO CON LIMPIEZA
+// src/components/checkin/RoomGrid.jsx - CORREGIDO PARA LIMPIEZA
 import React from 'react';
 import { Bed, ShoppingCart, ChevronRight, Sparkles } from 'lucide-react';
 import Button from '../common/Button';
@@ -9,14 +9,20 @@ const RoomGrid = ({
   selectedRoom, 
   checkoutMode, 
   savedOrders, 
-  roomsNeedingCleaning, // NUEVO: Set de habitaciones que necesitan limpieza
+  roomsNeedingCleaning,
+  cleanedRooms, // NUEVO: Recibir cleanedRooms como prop
   onFloorChange, 
   onRoomClick, 
   onNext 
 }) => {
   
-  // NUEVA FUNCIÓN: Determinar el estado real de la habitación
+  // MODIFICADA: Función para determinar el estado real de la habitación
   const getRoomActualStatus = (room) => {
+    // NUEVO: Si la habitación fue marcada como limpia, ahora está disponible
+    if (cleanedRooms && cleanedRooms.has(room.number)) {
+      return 'available';
+    }
+    
     // Verificar si necesita limpieza (prioridad más alta)
     if (roomsNeedingCleaning && roomsNeedingCleaning.has(room.number)) {
       return 'cleaning';
@@ -49,7 +55,7 @@ const RoomGrid = ({
     }
   };
 
-  // NUEVA FUNCIÓN: Verificar si la habitación es clickeable
+  // MODIFICADA: Función para verificar si la habitación es clickeable
   const isRoomClickable = (room) => {
     const actualStatus = getRoomActualStatus(room);
     
@@ -57,12 +63,12 @@ const RoomGrid = ({
       // En modo checkout, solo habitaciones ocupadas son clickeables
       return actualStatus === 'occupied';
     } else {
-      // En modo checkin, habitaciones disponibles y que necesitan limpieza son clickeables
+      // CORREGIDO: En modo checkin, habitaciones disponibles y que necesitan limpieza son clickeables
       return actualStatus === 'available' || actualStatus === 'cleaning';
     }
   };
 
-  // NUEVA FUNCIÓN: Obtener el ícono apropiado para cada habitación
+  // MODIFICADA: Función para obtener el ícono apropiado para cada habitación
   const getRoomIcon = (room) => {
     const actualStatus = getRoomActualStatus(room);
     
@@ -72,7 +78,7 @@ const RoomGrid = ({
     return <Bed className="w-8 h-8 mx-auto mb-2" />;
   };
 
-  // NUEVA FUNCIÓN: Obtener tooltip informativo
+  // MODIFICADA: Función para obtener tooltip informativo
   const getRoomTooltip = (room) => {
     const actualStatus = getRoomActualStatus(room);
     
@@ -164,10 +170,17 @@ const RoomGrid = ({
                 </div>
               )}
 
-              {/* NUEVO: Indicador especial para habitaciones que necesitan limpieza */}
+              {/* MODIFICADO: Indicador especial para habitaciones que necesitan limpieza */}
               {actualStatus === 'cleaning' && (
                 <div className="absolute -top-2 -left-2 bg-yellow-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
                   <Sparkles size={12} />
+                </div>
+              )}
+              
+              {/* NUEVO: Indicador para habitaciones recién limpiadas */}
+              {actualStatus === 'available' && cleanedRooms && cleanedRooms.has(room.number) && (
+                <div className="absolute -top-2 -left-2 bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                  ✓
                 </div>
               )}
             </button>
@@ -198,9 +211,13 @@ const RoomGrid = ({
             <Sparkles className="w-4 h-4 mr-2 text-yellow-600" />
             <span>Limpieza pendiente</span>
           </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-green-600 rounded mr-2 flex items-center justify-center text-white text-xs">✓</div>
+            <span>Recién limpiada</span>
+          </div>
         </div>
 
-        {/* Botón Siguiente - MODIFICADO para no mostrar en modo limpieza */}
+        {/* MODIFICADO: Botón Siguiente - Considerar habitaciones limpiadas */}
         {selectedRoom && getRoomActualStatus(selectedRoom) !== 'cleaning' && (
           <Button
             variant="primary"

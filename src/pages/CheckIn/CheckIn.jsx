@@ -339,6 +339,7 @@ const CheckIn = () => {
               checkoutMode={checkoutMode}
               savedOrders={savedOrders || {}}
               roomsNeedingCleaning={roomsNeedingCleaning}
+              cleanedRooms={cleanedRooms}
               onFloorChange={handleFloorChange}
               onRoomClick={handleRoomClick}
               onNext={() => {}}
