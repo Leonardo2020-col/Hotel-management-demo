@@ -268,7 +268,7 @@ const SnackSelection = ({
                     className="w-full text-sm py-4 text-lg font-semibold"
                   >
                     {selectedSnacks.length > 0 
-                      ? `🛒 Confirmar Check-in con Snacks` 
+                      ? `🛒 Confirmar Check-in` 
                       : `✅ Confirmar Check-in`
                     }
                     <div className="text-xs opacity-90 mt-1">

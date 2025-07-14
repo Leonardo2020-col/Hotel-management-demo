@@ -25,7 +25,13 @@ const CheckIn = () => {
     snackItems,
     roomPrices,
     savedOrders,
-    setSavedOrders
+    setSavedOrders,
+    loading: dataLoading,
+    error: dataError,
+    createOrder,
+    completeCheckout,
+    checkStockAvailability,
+    updateInventoryStock
   } = useCheckInData();
 
   // Estado para manejar habitaciones que necesitan limpieza
@@ -151,11 +157,32 @@ const CheckIn = () => {
   const handleSnackSelect = (snack) => {
     if (!snack) return;
     
+    // Verificar disponibilidad de stock
+    const stockCheck = checkStockAvailability(snack.id, 1);
+    if (!stockCheck.available) {
+      showNotification(
+        `Stock insuficiente para ${snack.name}. Stock actual: ${stockCheck.currentStock}`,
+        'error'
+      );
+      return;
+    }
+    
     const existingSnack = selectedSnacks.find(s => s.id === snack.id);
     if (existingSnack) {
+      const newQuantity = existingSnack.quantity + 1;
+      const newStockCheck = checkStockAvailability(snack.id, newQuantity);
+      
+      if (!newStockCheck.available) {
+        showNotification(
+          `Stock insuficiente para ${snack.name}. Stock actual: ${newStockCheck.currentStock}`,
+          'error'
+        );
+        return;
+      }
+      
       setSelectedSnacks(selectedSnacks.map(s => 
         s.id === snack.id 
-          ? { ...s, quantity: s.quantity + 1 }
+          ? { ...s, quantity: newQuantity }
           : s
       ));
     } else {
@@ -171,6 +198,17 @@ const CheckIn = () => {
     if (newQuantity <= 0) {
       handleSnackRemove(snackId);
     } else {
+      // Verificar disponibilidad de stock para la nueva cantidad
+      const stockCheck = checkStockAvailability(snackId, newQuantity);
+      if (!stockCheck.available) {
+        const snack = selectedSnacks.find(s => s.id === snackId);
+        showNotification(
+          `Stock insuficiente para ${snack?.name}. Stock actual: ${stockCheck.currentStock}`,
+          'error'
+        );
+        return;
+      }
+      
       setSelectedSnacks(selectedSnacks.map(s => 
         s.id === snackId 
           ? { ...s, quantity: newQuantity }
@@ -180,12 +218,13 @@ const CheckIn = () => {
   };
 
   // CORREGIDO: Función única para confirmar check-in
-  const handleConfirmCheckIn = () => {
+  const handleConfirmCheckIn = async () => {
     if (!currentOrder) return;
     
     const snacksTotal = selectedSnacks.reduce((total, snack) => total + (snack.price * snack.quantity), 0);
     const finalOrder = {
-      ...currentOrder,
+      room: currentOrder.room,
+      roomPrice: currentOrder.roomPrice,
       snacks: selectedSnacks,
       total: currentOrder.roomPrice + snacksTotal,
       guestName: `Huésped ${currentOrder.room.number}`,
@@ -193,25 +232,29 @@ const CheckIn = () => {
       checkInTime: new Date().toISOString()
     };
     
-    if (setSavedOrders) {
-      setSavedOrders(prev => ({
-        ...prev,
-        [finalOrder.room.number]: finalOrder
-      }));
+    // Usar la función createOrder del hook
+    const result = await createOrder(finalOrder);
+    
+    if (result.success) {
+      showNotification(
+        `Check-in completado exitosamente!\nHabitación ${finalOrder.room.number} - Total: ${finalOrder.total.toFixed(2)}`,
+        'success'
+      );
+      
+      // Limpiar estado de habitación limpiada al hacer check-in
+      setCleanedRooms(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(finalOrder.room.number);
+        return newSet;
+      });
+      
+      resetOrder();
+    } else {
+      showNotification(
+        `Error en check-in: ${result.error}`,
+        'error'
+      );
     }
-    
-    setCleanedRooms(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(finalOrder.room.number);
-      return newSet;
-    });
-    
-    showNotification(
-      `Check-in completado exitosamente!\nHabitación ${finalOrder.room.number} - Total: $${finalOrder.total.toFixed(2)}`,
-      'success'
-    );
-    
-    resetOrder();
   };
 
   // NUEVO: Función para proceder al pago en checkout
@@ -234,29 +277,32 @@ const CheckIn = () => {
   };
 
   // CORREGIDO: Función para procesar pago
-  const handleProcessPayment = (paymentMethod) => {
+  const handleProcessPayment = async (paymentMethod) => {
     if (!currentOrder) return;
     
-    showNotification(
-      `Pago procesado exitosamente!\nHabitación: ${currentOrder.room.number}\nTotal: $${currentOrder.total.toFixed(2)}\nMétodo: ${paymentMethod}`,
-      'success'
-    );
+    const result = await completeCheckout(currentOrder.room.number, paymentMethod);
     
-    if (setSavedOrders && savedOrders) {
-      const newSavedOrders = { ...savedOrders };
-      delete newSavedOrders[currentOrder.room.number];
-      setSavedOrders(newSavedOrders);
+    if (result.success) {
+      showNotification(
+        `Pago procesado exitosamente!\nHabitación: ${currentOrder.room.number}\nTotal: ${currentOrder.total.toFixed(2)}\nMétodo: ${paymentMethod}`,
+        'success'
+      );
+      
+      setCleanedRooms(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(currentOrder.room.number);
+        return newSet;
+      });
+      
+      setRoomsNeedingCleaning(prev => new Set(prev).add(currentOrder.room.number));
+      
+      resetOrder();
+    } else {
+      showNotification(
+        `Error procesando pago: ${result.error}`,
+        'error'
+      );
     }
-    
-    setCleanedRooms(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(currentOrder.room.number);
-      return newSet;
-    });
-    
-    setRoomsNeedingCleaning(prev => new Set(prev).add(currentOrder.room.number));
-    
-    resetOrder();
   };
 
   const resetOrder = () => {
@@ -269,12 +315,17 @@ const CheckIn = () => {
   };
 
   // Mostrar loading si los datos no están listos
-  if (!floorRooms || Object.keys(floorRooms).length === 0) {
+  if (dataLoading || !floorRooms || Object.keys(floorRooms).length === 0) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando datos...</p>
+          <p className="text-gray-600">
+            {dataLoading ? 'Cargando datos desde Supabase...' : 'Cargando datos...'}
+          </p>
+          {dataError && (
+            <p className="text-red-600 text-sm mt-2">Error: {dataError}</p>
+          )}
         </div>
       </div>
     );
