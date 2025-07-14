@@ -1,4 +1,4 @@
-// src/pages/CheckIn/CheckIn.jsx - CORREGIDO CON LÓGICA DE LIMPIEZA
+// src/pages/CheckIn/CheckIn.jsx - CORREGIDO Y OPTIMIZADO
 import React, { useState } from 'react';
 import { LogIn, LogOut } from 'lucide-react';
 import Button from '../../components/common/Button';
@@ -16,6 +16,7 @@ const CheckIn = () => {
   const [selectedSnackType, setSelectedSnackType] = useState(null);
   const [selectedSnacks, setSelectedSnacks] = useState([]);
   const [currentOrder, setCurrentOrder] = useState(null);
+  const [notification, setNotification] = useState(null);
   
   // Hook personalizado para datos
   const {
@@ -31,7 +32,6 @@ const CheckIn = () => {
   const [roomsNeedingCleaning, setRoomsNeedingCleaning] = useState(() => {
     const cleaningRooms = new Set();
     
-    // Verificar que floorRooms existe antes de usarlo
     if (floorRooms && typeof floorRooms === 'object') {
       Object.values(floorRooms).forEach(floor => {
         if (Array.isArray(floor)) {
@@ -47,29 +47,31 @@ const CheckIn = () => {
     return cleaningRooms;
   });
 
-  // NUEVO: Estado para habitaciones que han sido limpiadas (disponibles)
+  // Estado para habitaciones que han sido limpiadas (disponibles)
   const [cleanedRooms, setCleanedRooms] = useState(new Set());
 
-  // MODIFICADA: Función para determinar el estado real de la habitación
+  // Función para mostrar notificaciones estilizadas
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // Función para determinar el estado real de la habitación
   const getRoomActualStatus = (room) => {
     if (!room) return 'available';
     
-    // NUEVO: Si la habitación fue marcada como limpia, ahora está disponible
     if (cleanedRooms.has(room.number)) {
       return 'available';
     }
     
-    // Verificar si necesita limpieza (prioridad más alta)
     if (roomsNeedingCleaning.has(room.number)) {
       return 'cleaning';
     }
     
-    // Verificar si está ocupada (tiene orden guardada)
     if (savedOrders && savedOrders[room.number]) {
       return 'occupied';
     }
     
-    // Estado por defecto del hook
     return room.status || 'available';
   };
 
@@ -86,22 +88,16 @@ const CheckIn = () => {
     const actualStatus = getRoomActualStatus(room);
     
     if (checkoutMode) {
-      // En modo checkout, solo habitaciones ocupadas
       if (savedOrders && savedOrders[room.number]) {
         setSelectedRoom(room);
         setCurrentOrder(savedOrders[room.number]);
-        // MODIFICADO: Ir a paso 1 (snacks) en lugar de paso 2 (pago directo)
         setOrderStep(1);
-        // Cargar los snacks existentes de la orden
         setSelectedSnacks(savedOrders[room.number].snacks || []);
       }
     } else {
-      // En modo checkin
       if (actualStatus === 'cleaning') {
-        // Si la habitación necesita limpieza, marcarla como disponible
         handleRoomCleaned(room.number);
       } else if (actualStatus === 'available') {
-        // Si está disponible, iniciar check-in
         setSelectedRoom(room);
         const roomPrice = roomPrices && roomPrices[selectedFloor] ? roomPrices[selectedFloor] : 80;
         setCurrentOrder({
@@ -115,23 +111,24 @@ const CheckIn = () => {
     }
   };
 
-  // MODIFICADA: Función para manejar limpieza completada
+  // Función para manejar limpieza completada
   const handleRoomCleaned = (roomNumber) => {
-    // Remover de habitaciones que necesitan limpieza
     setRoomsNeedingCleaning(prev => {
       const newSet = new Set(prev);
       newSet.delete(roomNumber);
       return newSet;
     });
     
-    // NUEVO: Agregar a habitaciones limpiadas (disponibles)
     setCleanedRooms(prev => {
       const newSet = new Set(prev);
       newSet.add(roomNumber);
       return newSet;
     });
     
-    alert(`Habitación ${roomNumber} marcada como limpia y disponible`);
+    showNotification(
+      `Habitación ${roomNumber} marcada como limpia y disponible`,
+      'info'
+    );
   };
 
   const handleCheckOutClick = () => {
@@ -182,8 +179,8 @@ const CheckIn = () => {
     }
   };
 
-  // MODIFICADA: Agregar orden a savedOrders al confirmar
-  const handleConfirmOrder = () => {
+  // CORREGIDO: Función única para confirmar check-in
+  const handleConfirmCheckIn = () => {
     if (!currentOrder) return;
     
     const snacksTotal = selectedSnacks.reduce((total, snack) => total + (snack.price * snack.quantity), 0);
@@ -196,7 +193,6 @@ const CheckIn = () => {
       checkInTime: new Date().toISOString()
     };
     
-    // Guardar la orden para poder hacer checkout después
     if (setSavedOrders) {
       setSavedOrders(prev => ({
         ...prev,
@@ -204,88 +200,61 @@ const CheckIn = () => {
       }));
     }
     
-    // NUEVO: Limpiar estado de habitación limpiada al hacer check-in
     setCleanedRooms(prev => {
       const newSet = new Set(prev);
       newSet.delete(finalOrder.room.number);
       return newSet;
     });
     
-    console.log('Orden confirmada:', finalOrder);
-    alert(`Check-in completado!\nHabitación: ${finalOrder.room.number}\nPrecio habitación: $${finalOrder.roomPrice.toFixed(2)}\nSnacks: $${snacksTotal.toFixed(2)}\nTotal: $${finalOrder.total.toFixed(2)}`);
+    showNotification(
+      `Check-in completado exitosamente!\nHabitación ${finalOrder.room.number} - Total: $${finalOrder.total.toFixed(2)}`,
+      'success'
+    );
+    
     resetOrder();
   };
 
-  // MODIFICADA: Agregar orden a savedOrders al confirmar solo habitación
-  const handleConfirmRoomOnly = () => {
+  // NUEVO: Función para proceder al pago en checkout
+  const handleProceedToPayment = () => {
     if (!currentOrder) return;
     
-    const finalOrder = {
+    // Actualizar la orden actual con snacks adicionales
+    const additionalSnacksTotal = selectedSnacks.reduce((total, snack) => total + (snack.price * snack.quantity), 0);
+    const originalSnacksTotal = (currentOrder.snacks || []).reduce((total, snack) => total + (snack.price * snack.quantity), 0);
+    const allSnacks = [...(currentOrder.snacks || []), ...selectedSnacks];
+    
+    const updatedOrder = {
       ...currentOrder,
-      snacks: [],
-      total: currentOrder.roomPrice,
-      guestName: `Huésped ${currentOrder.room.number}`,
-      checkInDate: new Date().toISOString().split('T')[0],
-      checkInTime: new Date().toISOString()
+      snacks: allSnacks,
+      total: currentOrder.roomPrice + originalSnacksTotal + additionalSnacksTotal
     };
     
-    // Guardar la orden para poder hacer checkout después
-    if (setSavedOrders) {
-      setSavedOrders(prev => ({
-        ...prev,
-        [finalOrder.room.number]: finalOrder
-      }));
-    }
-    
-    // NUEVO: Limpiar estado de habitación limpiada al hacer check-in
-    setCleanedRooms(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(finalOrder.room.number);
-      return newSet;
-    });
-    
-    console.log('Habitación confirmada sin snacks:', finalOrder);
-    alert(`Check-in completado!\nHabitación: ${finalOrder.room.number}\nTotal: $${finalOrder.total.toFixed(2)}`);
-    resetOrder();
+    setCurrentOrder(updatedOrder);
+    setOrderStep(2);
   };
 
-  // MODIFICADA: Manejar checkout y marcar habitación para limpieza
+  // CORREGIDO: Función para procesar pago
   const handleProcessPayment = (paymentMethod) => {
     if (!currentOrder) return;
     
-    // NUEVO: Si estamos en checkout, actualizar la orden con snacks adicionales
-    let finalOrder = currentOrder;
-    if (checkoutMode) {
-      const additionalSnacksTotal = selectedSnacks.reduce((total, snack) => total + (snack.price * snack.quantity), 0);
-      const allSnacks = [...(currentOrder.snacks || []), ...selectedSnacks];
-      
-      finalOrder = {
-        ...currentOrder,
-        snacks: allSnacks,
-        total: currentOrder.roomPrice + 
-               (currentOrder.snacks || []).reduce((total, snack) => total + (snack.price * snack.quantity), 0) +
-               additionalSnacksTotal
-      };
-    }
+    showNotification(
+      `Pago procesado exitosamente!\nHabitación: ${currentOrder.room.number}\nTotal: $${currentOrder.total.toFixed(2)}\nMétodo: ${paymentMethod}`,
+      'success'
+    );
     
-    alert(`Pago procesado exitosamente!\nHabitación: ${finalOrder.room.number}\nHuésped: ${finalOrder.guestName}\nTotal: ${finalOrder.total.toFixed(2)}\nMétodo: ${paymentMethod}\n\nCheck-out completado.`);
-    
-    // Remover la orden guardada
     if (setSavedOrders && savedOrders) {
       const newSavedOrders = { ...savedOrders };
-      delete newSavedOrders[finalOrder.room.number];
+      delete newSavedOrders[currentOrder.room.number];
       setSavedOrders(newSavedOrders);
     }
     
-    // Remover de habitaciones limpiadas si estaba ahí
     setCleanedRooms(prev => {
       const newSet = new Set(prev);
-      newSet.delete(finalOrder.room.number);
+      newSet.delete(currentOrder.room.number);
       return newSet;
     });
     
-    // Marcar habitación como necesitando limpieza
-    setRoomsNeedingCleaning(prev => new Set(prev).add(finalOrder.room.number));
+    setRoomsNeedingCleaning(prev => new Set(prev).add(currentOrder.room.number));
     
     resetOrder();
   };
@@ -319,6 +288,47 @@ const CheckIn = () => {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Reception Panel</h1>
         </div>
+
+        {/* Componente de Notificación */}
+        {notification && (
+          <div className={`fixed top-4 right-4 z-50 max-w-md p-4 rounded-lg shadow-lg border-l-4 transition-all duration-300 transform ${
+            notification.type === 'success' 
+              ? 'bg-green-50 border-green-500 text-green-800' 
+              : notification.type === 'info'
+              ? 'bg-blue-50 border-blue-500 text-blue-800'
+              : 'bg-red-50 border-red-500 text-red-800'
+          }`}>
+            <div className="flex items-start">
+              <div className="flex-shrink-0 mr-3">
+                {notification.type === 'success' && (
+                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                {notification.type === 'info' && (
+                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-sm whitespace-pre-line">{notification.message}</div>
+              </div>
+              <button 
+                onClick={() => setNotification(null)}
+                className="flex-shrink-0 ml-3 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons - Solo mostrar en paso 0 */}
         {orderStep === 0 && (
@@ -364,7 +374,7 @@ const CheckIn = () => {
             />
           )}
 
-          {/* Paso 1: Selección de Snacks - MODIFICADO para incluir checkout */}
+          {/* Paso 1: Selección de Snacks */}
           {orderStep === 1 && (
             <SnackSelection
               currentOrder={currentOrder}
@@ -378,10 +388,10 @@ const CheckIn = () => {
               onSnackSelect={handleSnackSelect}
               onSnackRemove={handleSnackRemove}
               onQuantityUpdate={handleQuantityUpdate}
-              onConfirmOrder={handleConfirmOrder}
-              onConfirmRoomOnly={handleConfirmRoomOnly}
+              onConfirmOrder={handleConfirmCheckIn}
+              onConfirmRoomOnly={handleConfirmCheckIn}
               onCancelOrder={resetOrder}
-              onProceedToPayment={() => setOrderStep(2)}
+              onProceedToPayment={handleProceedToPayment}
             />
           )}
 
@@ -389,7 +399,7 @@ const CheckIn = () => {
           {orderStep === 2 && checkoutMode && (
             <CheckoutSummary
               currentOrder={currentOrder}
-              onBack={() => setOrderStep(0)}
+              onBack={() => setOrderStep(1)}
               onProcessPayment={handleProcessPayment}
               onCancel={resetOrder}
             />

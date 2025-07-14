@@ -259,28 +259,22 @@ const SnackSelection = ({
                   </Button>
                 </>
               ) : (
-                // Botones para modo checkin (originales)
+                // MODIFICADO: Botones para modo checkin - UN SOLO BOTÓN
                 <>
                   <Button
-                    variant="success"
-                    onClick={onConfirmRoomOnly}
-                    className="w-full text-sm py-3"
+                    variant="primary"
+                    onClick={selectedSnacks.length > 0 ? onConfirmOrder : onConfirmRoomOnly}
+                    icon={selectedSnacks.length > 0 ? ShoppingCart : Check}
+                    className="w-full text-sm py-4 text-lg font-semibold"
                   >
-                    ✅ Confirmar Solo Habitación
-                    <div className="text-xs opacity-90">${currentOrder?.roomPrice.toFixed(2)}</div>
+                    {selectedSnacks.length > 0 
+                      ? `🛒 Confirmar Check-in con Snacks` 
+                      : `✅ Confirmar Check-in`
+                    }
+                    <div className="text-xs opacity-90 mt-1">
+                      Total: ${selectedSnacks.length > 0 ? getTotalOrder().toFixed(2) : currentOrder?.roomPrice.toFixed(2)}
+                    </div>
                   </Button>
-                  
-                  {selectedSnacks.length > 0 && (
-                    <Button
-                      variant="primary"
-                      onClick={onConfirmOrder}
-                      icon={Check}
-                      className="w-full text-sm py-3"
-                    >
-                      🛒 Confirmar con Snacks
-                      <div className="text-xs opacity-90">${getTotalOrder().toFixed(2)} total</div>
-                    </Button>
-                  )}
                   
                   <Button
                     variant="outline"
