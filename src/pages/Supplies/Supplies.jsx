@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Package, Plus, Search, Filter, TrendingDown, AlertTriangle, FileText } from 'lucide-react';
-import { useSupplies } from '../../hooks/useSupplies';
+import { useInventory } from '../../hooks/useInventory';
 import Button from '../../components/common/Button';
 import SuppliesStats from '../../components/supplies/SuppliesStats';
 import SuppliesFilters from '../../components/supplies/SuppliesFilters';
@@ -44,7 +44,7 @@ const Supplies = () => {
     deleteSupply,
     recordConsumption,
     adjustStock
-  } = useSupplies();
+  } = useInventory();
 
   // Configuración de tabs
   const tabs = [

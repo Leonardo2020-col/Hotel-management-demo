@@ -87,7 +87,7 @@ const structure = {
     'useReports.js',
     'useReservations.js',
     'useRooms.js',
-    'useSupplies.js'
+    'useInventory.js'
   ],
   'src/layout': [
     'MainLayout.jsx'
