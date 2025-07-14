@@ -28,6 +28,11 @@ const RoomGrid = ({
       return 'cleaning';
     }
     
+    // NUEVO: Manejar estado 'checkout' de Supabase como 'cleaning'
+    if (room.status === 'checkout') {
+      return 'cleaning';
+    }
+    
     // Verificar si está ocupada (tiene orden guardada)
     if (savedOrders && savedOrders[room.number]) {
       return 'occupied';
@@ -64,7 +69,10 @@ const RoomGrid = ({
       return actualStatus === 'occupied';
     } else {
       // CORREGIDO: En modo checkin, habitaciones disponibles y que necesitan limpieza son clickeables
-      return actualStatus === 'available' || actualStatus === 'cleaning';
+      // También incluir habitaciones con status 'checkout' de Supabase
+      return actualStatus === 'available' || 
+             actualStatus === 'cleaning' || 
+             room.status === 'checkout';
     }
   };
 

@@ -6,6 +6,7 @@ import RoomGrid from '../../components/checkin/RoomGrid';
 import SnackSelection from '../../components/checkin/SnackSelection';
 import CheckoutSummary from '../../components/checkin/CheckoutSummary';
 import { useCheckInData } from '../../hooks/useCheckInData';
+import { supabase } from '../../lib/supabase';
 
 const CheckIn = () => {
   // Estados principales
@@ -62,7 +63,7 @@ const CheckIn = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // Función para determinar el estado real de la habitación
+  // MODIFICADA: Función para determinar el estado real de la habitación
   const getRoomActualStatus = (room) => {
     if (!room) return 'available';
     
@@ -71,6 +72,11 @@ const CheckIn = () => {
     }
     
     if (roomsNeedingCleaning.has(room.number)) {
+      return 'cleaning';
+    }
+    
+    // NUEVO: Manejar estado 'checkout' de Supabase como 'cleaning'
+    if (room.status === 'checkout') {
       return 'cleaning';
     }
     
@@ -117,8 +123,9 @@ const CheckIn = () => {
     }
   };
 
-  // Función para manejar limpieza completada
-  const handleRoomCleaned = (roomNumber) => {
+  // MODIFICADA: Función para manejar limpieza completada
+  const handleRoomCleaned = async (roomNumber) => {
+    // Remover de habitaciones que necesitan limpieza
     setRoomsNeedingCleaning(prev => {
       const newSet = new Set(prev);
       newSet.delete(roomNumber);
@@ -131,10 +138,28 @@ const CheckIn = () => {
       return newSet;
     });
     
-    showNotification(
-      `Habitación ${roomNumber} marcada como limpia y disponible`,
-      'info'
-    );
+    // NUEVO: Actualizar estado en Supabase
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .update({ status: 'available' })
+        .eq('number', roomNumber);
+      
+      if (error) {
+        console.error('Error actualizando estado de habitación:', error);
+      }
+      
+      showNotification(
+        `Habitación ${roomNumber} marcada como limpia y disponible`,
+        'info'
+      );
+    } catch (error) {
+      console.error('Error actualizando habitación:', error);
+      showNotification(
+        `Habitación ${roomNumber} marcada como limpia localmente`,
+        'info'
+      );
+    }
   };
 
   const handleCheckOutClick = () => {
