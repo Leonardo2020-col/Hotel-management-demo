@@ -7,7 +7,7 @@ import Button from '../common/Button';
 
 const schema = yup.object().shape({
   name: yup.string().required('El nombre del insumo es obligatorio'),
-  description: yup.string().required('La descripción es obligatoria'),
+  description: yup.string(), // Ahora opcional
   sku: yup.string(), // Ahora opcional
   category: yup.string().required('La categoría es obligatoria'),
   supplier: yup.string(), // Ahora opcional
@@ -257,20 +257,20 @@ const CreateSupplyModal = ({ isOpen, onClose, onSubmit, categories, suppliers })
             </div>
 
             {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Descripción <span className="text-gray-500">(opcional)</span>
-              </label>
-              <textarea
-                {...register('description')}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Describe las características del insumo..."
-              />
-              {errors.description && (
-                <p className="text-red-600 text-sm mt-1">{errors.description.message}</p>
-              )}
-            </div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Descripción
+  </label>
+  <textarea
+    {...register('description')}
+    rows={3}
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    placeholder="Describe las características del insumo... (opcional)"
+  />
+  {errors.description && (
+    <p className="text-red-600 text-sm mt-1">{errors.description.message}</p>
+  )}
+</div>
 
             {/* Stock and Pricing */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
