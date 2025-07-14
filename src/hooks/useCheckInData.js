@@ -1,4 +1,4 @@
-// src/hooks/useCheckInData.js - VERSIÓN ROBUSTA CON FALLBACKS
+// src/hooks/useCheckInData.js - CORREGIDO PARA REACT
 import { useState, useEffect } from 'react';
 import { supabase, safeQuery, handleAuthError } from '../lib/supabase';
 
@@ -12,7 +12,7 @@ export const useCheckInData = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Cargar habitaciones desde Supabase con fallback
+  // Cargar habitaciones desde Supabase con fallback robusto
   const loadRooms = async () => {
     try {
       const result = await safeQuery(async () => {
@@ -25,7 +25,7 @@ export const useCheckInData = () => {
         return { data, error: null };
       });
 
-      if (result.error) {
+      if (result.error || !result.data) {
         console.warn('Error loading rooms from Supabase, using fallback:', result.error);
         return getFallbackRooms();
       }
@@ -105,7 +105,7 @@ export const useCheckInData = () => {
         return { data, error: null };
       });
 
-      if (result.error) {
+      if (result.error || !result.data) {
         console.warn('Error loading service types, using fallback:', result.error);
         return getFallbackSnackTypes();
       }
@@ -152,7 +152,7 @@ export const useCheckInData = () => {
         return { data, error: null };
       });
 
-      if (result.error) {
+      if (result.error || !result.data) {
         console.warn('Error loading services, using fallback:', result.error);
         return getFallbackSnackItems();
       }
@@ -249,7 +249,7 @@ export const useCheckInData = () => {
         return { data, error: null };
       });
 
-      if (result.error) {
+      if (result.error || !result.data) {
         console.warn('Error loading orders, using empty state:', result.error);
         setSavedOrders({});
         return {};
@@ -561,6 +561,7 @@ export const useCheckInData = () => {
         };
       }
     }
+    // Si no se encuentra el item, asumir que está disponible (modo fallback)
     return { available: true, currentStock: 100, requested: requestedQuantity, shortfall: 0 };
   };
 

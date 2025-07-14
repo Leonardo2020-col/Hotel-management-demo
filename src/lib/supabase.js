@@ -1,19 +1,19 @@
-// src/lib/supabase.js - CONFIGURACIÓN CORREGIDA PARA VITE
+// src/lib/supabase.js - CONFIGURACIÓN CORREGIDA PARA REACT (CREATE REACT APP)
 import { createClient } from '@supabase/supabase-js'
 
-// Configuración de Supabase - CORREGIDO PARA VITE
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Configuración de Supabase para React
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY
 
 // Validación de variables de entorno
 if (!supabaseUrl) {
-  console.error('❌ VITE_SUPABASE_URL no está definida en las variables de entorno')
-  console.log('💡 Agrega VITE_SUPABASE_URL=tu_url_de_supabase en tu archivo .env')
+  console.error('❌ REACT_APP_SUPABASE_URL no está definida en las variables de entorno')
+  console.log('💡 Agrega REACT_APP_SUPABASE_URL=tu_url_de_supabase en tu archivo .env')
 }
 
 if (!supabaseAnonKey) {
-  console.error('❌ VITE_SUPABASE_ANON_KEY no está definida en las variables de entorno')
-  console.log('💡 Agrega VITE_SUPABASE_ANON_KEY=tu_anon_key en tu archivo .env')
+  console.error('❌ REACT_APP_SUPABASE_ANON_KEY no está definida en las variables de entorno')
+  console.log('💡 Agrega REACT_APP_SUPABASE_ANON_KEY=tu_anon_key en tu archivo .env')
 }
 
 // Crear cliente de Supabase con configuración robusta
@@ -31,7 +31,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'X-Client-Info': 'hotel-management-vite'
+      'X-Client-Info': 'hotel-management-react'
     }
   }
 })
@@ -51,6 +51,10 @@ export const handleAuthError = (error) => {
     return { success: false, error: 'No se encontraron resultados', notFound: true }
   }
   
+  if (error?.code === '42P01') {
+    return { success: false, error: 'Tabla no existe en la base de datos', tableNotFound: true }
+  }
+  
   return { success: false, error: error.message }
 }
 
@@ -65,7 +69,7 @@ export const checkAuth = async () => {
   }
 }
 
-// Función helper para queries con manejo de errores
+// Función helper para queries con manejo de errores robusto
 export const safeQuery = async (queryFn, requireAuth = false) => {
   try {
     if (requireAuth) {
@@ -82,81 +86,11 @@ export const safeQuery = async (queryFn, requireAuth = false) => {
   }
 }
 
-// ==================== AUTENTICACIÓN MEJORADA ====================
+// ==================== FUNCIONES ESPECÍFICAS PARA EL SISTEMA ====================
 
-export const auth = {
-  // Iniciar sesión
-  signIn: async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-      return handleAuthError(error) ? { data, error: null } : { data: null, error }
-    } catch (error) {
-      console.error('Error en signIn:', error)
-      return { data: null, error: error.message }
-    }
-  },
-
-  // Registrar usuario (simplificado para evitar errores admin)
-  signUp: async (email, password, metadata = {}) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata
-        }
-      })
-      return handleAuthError(error) ? { data, error: null } : { data: null, error }
-    } catch (error) {
-      console.error('Error en signUp:', error)
-      return { data: null, error: error.message }
-    }
-  },
-
-  // Cerrar sesión
-  signOut: async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      return { error: error?.message || null }
-    } catch (error) {
-      console.error('Error en signOut:', error)
-      return { error: error.message }
-    }
-  },
-
-  // Obtener usuario actual
-  getCurrentUser: async () => {
-    try {
-      const { data, error } = await supabase.auth.getUser()
-      return handleAuthError(error) ? { data, error: null } : { data: null, error }
-    } catch (error) {
-      return { data: null, error: error.message }
-    }
-  },
-
-  // Obtener sesión actual
-  getCurrentSession: async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession()
-      return handleAuthError(error) ? { data, error: null } : { data: null, error }
-    } catch (error) {
-      return { data: null, error: error.message }
-    }
-  },
-
-  // Escuchar cambios de autenticación
-  onAuthStateChange: (callback) => {
-    return supabase.auth.onAuthStateChange(callback)
-  }
-}
-
-// ==================== HABITACIONES ROBUSTAS ====================
-
+// Habitaciones con fallback robusto
 export const rooms = {
-  // Obtener todas las habitaciones con fallback
+  // Obtener todas las habitaciones
   getAll: async () => {
     try {
       const { data, error } = await supabase
@@ -211,26 +145,12 @@ export const rooms = {
       if (error) throw error
       return { data, error: null }
     })
-  },
-
-  // Crear nueva habitación
-  create: async (roomData) => {
-    return await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('rooms')
-        .insert([roomData])
-        .select()
-      
-      if (error) throw error
-      return { data, error: null }
-    })
   }
 }
 
-// ==================== SERVICIOS/SNACKS ROBUSTOS ====================
-
+// Servicios/snacks con fallback
 export const services = {
-  // Obtener todos los servicios con fallback
+  // Obtener todos los servicios
   getAll: async () => {
     try {
       const { data, error } = await supabase
@@ -294,8 +214,7 @@ export const services = {
   }
 }
 
-// ==================== ÓRDENES ROBUSTAS ====================
-
+// Órdenes con manejo robusto
 export const orders = {
   // Obtener órdenes activas
   getActive: async () => {
@@ -358,53 +277,9 @@ export const orders = {
   }
 }
 
-// ==================== HUÉSPEDES ====================
+// ==================== DATOS DE FALLBACK ====================
 
-export const guests = {
-  // Obtener todos los huéspedes
-  getAll: async () => {
-    return await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('guests')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
-      if (error) throw error
-      return { data, error: null }
-    })
-  },
-
-  // Crear nuevo huésped
-  create: async (guestData) => {
-    return await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('guests')
-        .insert([guestData])
-        .select()
-      
-      if (error) throw error
-      return { data, error: null }
-    })
-  },
-
-  // Buscar huésped
-  search: async (query) => {
-    return await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('guests')
-        .select('*')
-        .or(`dni.ilike.%${query}%,email.ilike.%${query}%,full_name.ilike.%${query}%`)
-        .order('full_name')
-      
-      if (error) throw error
-      return { data, error: null }
-    })
-  }
-}
-
-// ==================== FUNCIONES FALLBACK ====================
-
-// Datos de habitaciones de fallback
+// Datos de habitaciones de fallback para cuando Supabase no funciona
 const getFallbackRooms = () => {
   const rooms = []
   
@@ -455,40 +330,40 @@ const getFallbackRooms = () => {
 
 // Datos de tipos de servicios de fallback
 const getFallbackServiceTypes = () => [
-  { id: 'frutas', name: 'FRUTAS', description: 'Frutas frescas y naturales' },
-  { id: 'bebidas', name: 'BEBIDAS', description: 'Bebidas frías y calientes' },
-  { id: 'snacks', name: 'SNACKS', description: 'Bocadillos y aperitivos' },
-  { id: 'postres', name: 'POSTRES', description: 'Dulces y postres' }
+  { id: 'frutas', name: 'FRUTAS', description: 'Frutas frescas y naturales', active: true },
+  { id: 'bebidas', name: 'BEBIDAS', description: 'Bebidas frías y calientes', active: true },
+  { id: 'snacks', name: 'SNACKS', description: 'Bocadillos y aperitivos', active: true },
+  { id: 'postres', name: 'POSTRES', description: 'Dulces y postres', active: true }
 ]
 
 // Datos de servicios de fallback
 const getFallbackServices = () => [
   // Frutas
-  { id: 1, name: 'Manzana', price: 2.50, type_id: 'frutas', stock_quantity: 50 },
-  { id: 2, name: 'Plátano', price: 1.50, type_id: 'frutas', stock_quantity: 30 },
-  { id: 3, name: 'Naranja', price: 2.00, type_id: 'frutas', stock_quantity: 40 },
-  { id: 4, name: 'Uvas', price: 4.00, type_id: 'frutas', stock_quantity: 25 },
+  { id: 1, name: 'Manzana', price: 2.50, type_id: 'frutas', stock_quantity: 50, available: true, category: 'frutas' },
+  { id: 2, name: 'Plátano', price: 1.50, type_id: 'frutas', stock_quantity: 30, available: true, category: 'frutas' },
+  { id: 3, name: 'Naranja', price: 2.00, type_id: 'frutas', stock_quantity: 40, available: true, category: 'frutas' },
+  { id: 4, name: 'Uvas', price: 4.00, type_id: 'frutas', stock_quantity: 25, available: true, category: 'frutas' },
   
   // Bebidas
-  { id: 6, name: 'Agua', price: 1.00, type_id: 'bebidas', stock_quantity: 100 },
-  { id: 7, name: 'Coca Cola', price: 2.50, type_id: 'bebidas', stock_quantity: 80 },
-  { id: 8, name: 'Jugo de naranja', price: 3.00, type_id: 'bebidas', stock_quantity: 60 },
-  { id: 9, name: 'Café', price: 2.00, type_id: 'bebidas', stock_quantity: 45 },
+  { id: 6, name: 'Agua', price: 1.00, type_id: 'bebidas', stock_quantity: 100, available: true, category: 'bebidas' },
+  { id: 7, name: 'Coca Cola', price: 2.50, type_id: 'bebidas', stock_quantity: 80, available: true, category: 'bebidas' },
+  { id: 8, name: 'Jugo de naranja', price: 3.00, type_id: 'bebidas', stock_quantity: 60, available: true, category: 'bebidas' },
+  { id: 9, name: 'Café', price: 2.00, type_id: 'bebidas', stock_quantity: 45, available: true, category: 'bebidas' },
   
   // Snacks
-  { id: 11, name: 'Papas fritas', price: 3.50, type_id: 'snacks', stock_quantity: 40 },
-  { id: 12, name: 'Galletas', price: 2.00, type_id: 'snacks', stock_quantity: 35 },
-  { id: 13, name: 'Nueces', price: 4.50, type_id: 'snacks', stock_quantity: 30 },
-  { id: 14, name: 'Chocolate', price: 3.00, type_id: 'snacks', stock_quantity: 25 },
+  { id: 11, name: 'Papas fritas', price: 3.50, type_id: 'snacks', stock_quantity: 40, available: true, category: 'snacks' },
+  { id: 12, name: 'Galletas', price: 2.00, type_id: 'snacks', stock_quantity: 35, available: true, category: 'snacks' },
+  { id: 13, name: 'Nueces', price: 4.50, type_id: 'snacks', stock_quantity: 30, available: true, category: 'snacks' },
+  { id: 14, name: 'Chocolate', price: 3.00, type_id: 'snacks', stock_quantity: 25, available: true, category: 'snacks' },
   
   // Postres
-  { id: 16, name: 'Helado', price: 4.00, type_id: 'postres', stock_quantity: 30 },
-  { id: 17, name: 'Torta', price: 5.50, type_id: 'postres', stock_quantity: 18 },
-  { id: 18, name: 'Flan', price: 3.50, type_id: 'postres', stock_quantity: 22 },
-  { id: 19, name: 'Brownie', price: 4.50, type_id: 'postres', stock_quantity: 20 }
+  { id: 16, name: 'Helado', price: 4.00, type_id: 'postres', stock_quantity: 30, available: true, category: 'postres' },
+  { id: 17, name: 'Torta', price: 5.50, type_id: 'postres', stock_quantity: 18, available: true, category: 'postres' },
+  { id: 18, name: 'Flan', price: 3.50, type_id: 'postres', stock_quantity: 22, available: true, category: 'postres' },
+  { id: 19, name: 'Brownie', price: 4.50, type_id: 'postres', stock_quantity: 20, available: true, category: 'postres' }
 ]
 
-// ==================== UTILIDADES MEJORADAS ====================
+// ==================== UTILIDADES ====================
 
 export const utils = {
   // Formatear error de Supabase
@@ -500,13 +375,13 @@ export const utils = {
       '23505': 'Ya existe un registro con estos datos',
       '23503': 'No se puede eliminar: existen registros relacionados',
       '42501': 'Permisos insuficientes para esta operación',
-      '42P01': 'La tabla no existe'
+      '42P01': 'La tabla no existe en la base de datos'
     }
     
     return errorMap[error.code] || error.message || 'Error desconocido'
   },
 
-  // Verificar conexión mejorada
+  // Verificar conexión
   testConnection: async () => {
     try {
       if (!supabaseUrl || !supabaseAnonKey) {
@@ -531,35 +406,27 @@ export const utils = {
     }
   },
 
-  // Log de configuración mejorado
+  // Log de configuración
   logConfig: () => {
-    console.log('🔧 Configuración de Supabase para Vite:')
+    console.log('🔧 Configuración de Supabase para React:')
     console.log('URL:', supabaseUrl ? '✅ Configurada' : '❌ No configurada')
     console.log('Anon Key:', supabaseAnonKey ? '✅ Configurada' : '❌ No configurada')
     
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.log('\n💡 Para configurar Supabase en Vite:')
+      console.log('\n💡 Para configurar Supabase en React:')
       console.log('1. Crea un archivo .env en la raíz del proyecto')
       console.log('2. Agrega las siguientes líneas:')
-      console.log('   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co')
-      console.log('   VITE_SUPABASE_ANON_KEY=tu_anon_key')
-      console.log('3. Reinicia el servidor de desarrollo (npm run dev)')
+      console.log('   REACT_APP_SUPABASE_URL=https://tu-proyecto.supabase.co')
+      console.log('   REACT_APP_SUPABASE_ANON_KEY=tu_anon_key')
+      console.log('3. Reinicia el servidor de desarrollo (npm start)')
     }
   },
 
   // Verificar si está en modo desarrollo
-  isDevelopment: () => import.meta.env.DEV,
-
-  // Obtener todas las variables de entorno
-  getEnvVars: () => ({
-    url: supabaseUrl,
-    hasAnonKey: !!supabaseAnonKey,
-    mode: import.meta.env.MODE,
-    dev: import.meta.env.DEV
-  })
+  isDevelopment: () => process.env.NODE_ENV === 'development'
 }
 
-// ==================== TIEMPO REAL MEJORADO ====================
+// ==================== TIEMPO REAL ====================
 
 export const realtime = {
   // Suscribirse a cambios en habitaciones
@@ -607,7 +474,7 @@ export const realtime = {
 }
 
 // Verificar configuración al importar solo en desarrollo
-if (import.meta.env.DEV) {
+if (process.env.NODE_ENV === 'development') {
   utils.logConfig()
   // Test de conexión en desarrollo
   setTimeout(() => {
@@ -615,8 +482,54 @@ if (import.meta.env.DEV) {
   }, 1000)
 }
 
-// Exportaciones compatibles con versiones anteriores
-export { supabase as default }
+// Exportaciones para compatibilidad
+export const auth = {
+  signIn: async (email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+      return handleAuthError(error) ? { data, error: null } : { data: null, error }
+    } catch (error) {
+      console.error('Error en signIn:', error)
+      return { data: null, error: error.message }
+    }
+  },
 
-// Nueva exportación para compatibilidad
-export const snacks = services
+  signOut: async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      return { error: error?.message || null }
+    } catch (error) {
+      console.error('Error en signOut:', error)
+      return { error: error.message }
+    }
+  },
+
+  getCurrentUser: async () => {
+    try {
+      const { data, error } = await supabase.auth.getUser()
+      return handleAuthError(error) ? { data, error: null } : { data: null, error }
+    } catch (error) {
+      return { data: null, error: error.message }
+    }
+  },
+
+  getCurrentSession: async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      return handleAuthError(error) ? { data, error: null } : { data: null, error }
+    } catch (error) {
+      return { data: null, error: error.message }
+    }
+  },
+
+  onAuthStateChange: (callback) => {
+    return supabase.auth.onAuthStateChange(callback)
+  }
+}
+
+// Exportar alias para compatibilidad
+export { services as snacks }
+export { supabase as default }
