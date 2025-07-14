@@ -1,4 +1,4 @@
-// src/hooks/useCheckInData.js - SNACKS DESDE TABLA INVENTORY
+// src/hooks/useCheckInData.js - CORREGIDO PARA USAR TABLA SERVICES
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
@@ -74,43 +74,27 @@ export const useCheckInData = () => {
     }
   };
 
-  // Cargar categorías de insumos como tipos de snacks
+  // Cargar tipos de servicios desde Supabase
   const loadSnackTypes = async () => {
     try {
-      // Obtener categorías únicas de la tabla inventory que podrían ser snacks
       const { data, error } = await supabase
-        .from('inventory')
-        .select('category')
-        .eq('status', 'active')
-        .gt('current_stock', 0)
-        .order('category');
+        .from('service_types')
+        .select('*')
+        .eq('active', true)
+        .order('name');
 
       if (error) throw error;
 
-      // Obtener categorías únicas
-      const uniqueCategories = [...new Set(data.map(item => item.category))];
-      
-      // Mapear categorías a formato esperado
-      const categoryMapping = {
-        'frutas': { name: 'FRUTAS', description: 'Frutas frescas y naturales' },
-        'bebidas': { name: 'BEBIDAS', description: 'Bebidas frías y calientes' },
-        'snacks': { name: 'SNACKS', description: 'Bocadillos y aperitivos' },
-        'postres': { name: 'POSTRES', description: 'Dulces y postres' },
-        'comida': { name: 'COMIDA', description: 'Comidas y platos' },
-        'dulces': { name: 'DULCES', description: 'Dulces y golosinas' },
-        'lacteos': { name: 'LÁCTEOS', description: 'Productos lácteos' }
-      };
-
-      const formattedTypes = uniqueCategories.map(category => ({
-        id: category.toLowerCase(),
-        name: categoryMapping[category.toLowerCase()]?.name || category.toUpperCase(),
-        description: categoryMapping[category.toLowerCase()]?.description || `Productos de ${category}`
+      const formattedTypes = data.map(type => ({
+        id: type.id,
+        name: type.name,
+        description: type.description || type.name
       }));
 
       setSnackTypes(formattedTypes);
       return formattedTypes;
     } catch (error) {
-      console.error('Error cargando categorías de insumos:', error);
+      console.error('Error cargando tipos de servicios:', error);
       setError(error.message);
       
       // Fallback a datos estáticos
@@ -125,72 +109,65 @@ export const useCheckInData = () => {
     }
   };
 
-  // Cargar insumos disponibles como snacks desde Supabase
+  // Cargar servicios/snacks desde Supabase
   const loadSnackItems = async () => {
     try {
       const { data, error } = await supabase
-        .from('inventory')
+        .from('services')
         .select('*')
-        .eq('status', 'active')
-        .gt('current_stock', 0)
+        .eq('available', true)
+        .gt('stock_quantity', 0)
         .order('category, name');
 
       if (error) throw error;
 
-      // Agrupar por categoría
+      // Agrupar por categoría/tipo
       const groupedItems = {};
       
       data.forEach(item => {
-        const categoryKey = item.category.toLowerCase();
+        const categoryKey = item.type_id || item.category || 'otros';
         
         if (!groupedItems[categoryKey]) {
           groupedItems[categoryKey] = [];
         }
         
-        // Calcular precio de venta (cost + margen de ganancia)
-        // Si no hay precio definido, usar cost * 1.5 como precio de venta
-        const sellingPrice = item.unit_cost ? parseFloat(item.unit_cost) * 1.5 : 0;
-        
         groupedItems[categoryKey].push({
           id: item.id,
           name: item.name,
-          price: sellingPrice, // Precio de venta calculado
-          cost: parseFloat(item.unit_cost || 0),
+          price: parseFloat(item.price),
+          cost: parseFloat(item.cost || 0),
           description: item.description,
-          stock: item.current_stock,
-          minStock: item.min_stock,
-          maxStock: item.max_stock,
+          stock: item.stock_quantity,
+          minStock: item.min_stock || 0,
           unit: item.unit,
-          sku: item.sku,
-          supplier: item.supplier,
-          location: item.location,
-          expiryDate: item.expiry_date,
-          stockLevel: item.current_stock <= item.min_stock ? 'LOW' : 
-                     item.current_stock <= item.min_stock * 1.5 ? 'MEDIUM' : 'HIGH'
+          category: item.category,
+          type_id: item.type_id,
+          stockLevel: item.stock_quantity <= (item.min_stock || 0) ? 'LOW' : 
+                     item.stock_quantity <= (item.min_stock || 0) * 1.5 ? 'MEDIUM' : 'HIGH'
         });
       });
 
       setSnackItems(groupedItems);
       return groupedItems;
     } catch (error) {
-      console.error('Error cargando insumos:', error);
+      console.error('Error cargando servicios:', error);
       setError(error.message);
       
       // Fallback a datos estáticos
       const fallbackItems = {
         frutas: [
-          { id: 'fallback-1', name: 'Manzana', price: 2.50, stock: 0 },
-          { id: 'fallback-2', name: 'Plátano', price: 1.50, stock: 0 }
+          { id: 1, name: 'Manzana', price: 2.50, stock: 50 },
+          { id: 2, name: 'Plátano', price: 1.50, stock: 30 }
         ],
         bebidas: [
-          { id: 'fallback-3', name: 'Agua', price: 1.00, stock: 0 },
-          { id: 'fallback-4', name: 'Coca Cola', price: 2.50, stock: 0 }
+          { id: 6, name: 'Agua', price: 1.00, stock: 100 },
+          { id: 7, name: 'Coca Cola', price: 2.50, stock: 80 }
         ],
         snacks: [
-          { id: 'fallback-5', name: 'Papas fritas', price: 3.50, stock: 0 }
+          { id: 11, name: 'Papas fritas', price: 3.50, stock: 40 }
         ],
         postres: [
-          { id: 'fallback-6', name: 'Helado', price: 4.00, stock: 0 }
+          { id: 16, name: 'Helado', price: 4.00, stock: 30 }
         ]
       };
       setSnackItems(fallbackItems);
@@ -257,13 +234,27 @@ export const useCheckInData = () => {
   // Función para crear nueva orden en Supabase
   const createOrder = async (orderData) => {
     try {
+      // Obtener guest_id si existe el huésped
+      let guestId = null;
+      const { data: guestData } = await supabase
+        .from('guests')
+        .select('id')
+        .eq('full_name', orderData.guestName)
+        .single();
+      
+      if (guestData) {
+        guestId = guestData.id;
+      }
+
       // Crear la orden principal
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
         .insert([{
           room_number: orderData.room.number,
           guest_name: orderData.guestName,
+          guest_id: guestId,
           room_price: orderData.roomPrice,
+          services_total: orderData.total - orderData.roomPrice,
           total: orderData.total,
           check_in_date: orderData.checkInDate,
           check_in_time: new Date().toISOString(),
@@ -276,63 +267,23 @@ export const useCheckInData = () => {
 
       // Crear los servicios de la orden si hay snacks
       if (orderData.snacks && orderData.snacks.length > 0) {
-        // Primero, crear entradas en services para los insumos si no existen
-        const serviceEntries = [];
-        
-        for (const snack of orderData.snacks) {
-          // Verificar si ya existe un service para este insumo
-          const { data: existingService, error: serviceCheckError } = await supabase
-            .from('services')
-            .select('id')
-            .eq('name', snack.name)
-            .single();
+        const serviceEntries = orderData.snacks.map(snack => ({
+          order_id: newOrder.id,
+          service_id: snack.id,
+          quantity: snack.quantity,
+          unit_price: snack.price,
+          total_price: snack.price * snack.quantity
+        }));
 
-          let serviceId;
-          
-          if (serviceCheckError && serviceCheckError.code === 'PGRST116') {
-            // No existe, crear nuevo service
-            const { data: newService, error: newServiceError } = await supabase
-              .from('services')
-              .insert([{
-                name: snack.name,
-                description: snack.description || `${snack.name} del inventario`,
-                price: snack.price,
-                cost: snack.cost || 0,
-                type_id: 'inventory', // Tipo especial para items del inventario
-                category: 'inventory_item',
-                available: true,
-                stock_quantity: snack.stock
-              }])
-              .select('id')
-              .single();
-
-            if (newServiceError) throw newServiceError;
-            serviceId = newService.id;
-          } else if (existingService) {
-            serviceId = existingService.id;
-          } else {
-            throw serviceCheckError;
-          }
-
-          serviceEntries.push({
-            order_id: newOrder.id,
-            service_id: serviceId,
-            quantity: snack.quantity,
-            unit_price: snack.price,
-            total_price: snack.price * snack.quantity
-          });
-        }
-
-        // Insertar servicios de la orden
         const { error: servicesError } = await supabase
           .from('order_services')
           .insert(serviceEntries);
 
         if (servicesError) throw servicesError;
 
-        // Actualizar stock de inventario
+        // Actualizar stock de servicios
         for (const snack of orderData.snacks) {
-          await updateInventoryStock(snack.id, -snack.quantity);
+          await updateServiceStock(snack.id, -snack.quantity);
         }
       }
 
@@ -356,36 +307,36 @@ export const useCheckInData = () => {
     }
   };
 
-  // Función para actualizar stock de inventario
-  const updateInventoryStock = async (inventoryId, quantityChange) => {
+  // Función para actualizar stock de servicios
+  const updateServiceStock = async (serviceId, quantityChange) => {
     try {
       // Obtener stock actual
-      const { data: item, error: getError } = await supabase
-        .from('inventory')
-        .select('current_stock, name')
-        .eq('id', inventoryId)
+      const { data: service, error: getError } = await supabase
+        .from('services')
+        .select('stock_quantity, name')
+        .eq('id', serviceId)
         .single();
 
       if (getError) throw getError;
 
-      const newStock = item.current_stock + quantityChange;
+      const newStock = service.stock_quantity + quantityChange;
       
       // Verificar que no sea negativo
       if (newStock < 0) {
-        throw new Error(`Stock insuficiente para ${item.name}. Stock actual: ${item.current_stock}, solicitado: ${Math.abs(quantityChange)}`);
+        throw new Error(`Stock insuficiente para ${service.name}. Stock actual: ${service.stock_quantity}, solicitado: ${Math.abs(quantityChange)}`);
       }
 
       // Actualizar stock
       const { error: updateError } = await supabase
-        .from('inventory')
-        .update({ current_stock: newStock })
-        .eq('id', inventoryId);
+        .from('services')
+        .update({ stock_quantity: newStock })
+        .eq('id', serviceId);
 
       if (updateError) throw updateError;
 
       return { success: true, newStock };
     } catch (error) {
-      console.error('Error actualizando stock de inventario:', error);
+      console.error('Error actualizando stock de servicio:', error);
       return { success: false, error: error.message };
     }
   };
@@ -427,10 +378,10 @@ export const useCheckInData = () => {
     }
   };
 
-  // Función para verificar disponibilidad de stock en inventario
-  const checkStockAvailability = (inventoryId, requestedQuantity) => {
+  // Función para verificar disponibilidad de stock
+  const checkStockAvailability = (serviceId, requestedQuantity) => {
     for (const categoryItems of Object.values(snackItems)) {
-      const item = categoryItems.find(item => item.id === inventoryId);
+      const item = categoryItems.find(item => item.id === serviceId);
       if (item) {
         return {
           available: item.stock >= requestedQuantity,
@@ -484,6 +435,9 @@ export const useCheckInData = () => {
     }
   };
 
+  // Función para actualizar stock de inventario (alias para compatibilidad)
+  const updateInventoryStock = updateServiceStock;
+
   // Suscripción a cambios en tiempo real
   useEffect(() => {
     // Canal para habitaciones
@@ -498,15 +452,14 @@ export const useCheckInData = () => {
       )
       .subscribe();
 
-    // Canal para inventario
-    const inventoryChannel = supabase
-      .channel('inventory_changes')
+    // Canal para servicios
+    const servicesChannel = supabase
+      .channel('services_changes')
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'inventory' },
+        { event: '*', schema: 'public', table: 'services' },
         (payload) => {
-          console.log('Cambio en inventario:', payload);
+          console.log('Cambio en servicios:', payload);
           loadSnackItems();
-          loadSnackTypes();
         }
       )
       .subscribe();
@@ -526,7 +479,7 @@ export const useCheckInData = () => {
     // Cleanup
     return () => {
       supabase.removeChannel(roomsChannel);
-      supabase.removeChannel(inventoryChannel);
+      supabase.removeChannel(servicesChannel);
       supabase.removeChannel(ordersChannel);
     };
   }, []);
