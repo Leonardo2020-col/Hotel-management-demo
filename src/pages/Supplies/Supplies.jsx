@@ -30,8 +30,9 @@ const Supplies = () => {
     lowStock: false
   });
 
-  // Hook personalizado para datos de insumos
+  // Hook unificado para datos de inventario/insumos
   const {
+    // Datos principales (compatibilidad con useSupplies)
     supplies,
     categories,
     suppliers,
@@ -39,11 +40,19 @@ const Supplies = () => {
     consumptionHistory,
     loading,
     error,
+    
+    // Funciones CRUD (compatibilidad con useSupplies)
     createSupply,
     updateSupply,
     deleteSupply,
-    recordConsumption,
-    adjustStock
+    adjustStock,
+    
+    // Funciones adicionales del hook unificado
+    inventory,
+    allInventory,
+    filters: inventoryFilters,
+    setFilters: setInventoryFilters,
+    refreshData
   } = useInventory();
 
   // Configuración de tabs
@@ -62,11 +71,13 @@ const Supplies = () => {
     }
   ];
 
-  // Handlers
+  // Handlers corregidos
   const handleCreateSupply = async (supplyData) => {
     try {
-      await createSupply(supplyData);
-      setShowCreateModal(false);
+      const result = await createSupply(supplyData);
+      if (result.success) {
+        setShowCreateModal(false);
+      }
     } catch (error) {
       console.error('Error creating supply:', error);
     }
@@ -74,9 +85,11 @@ const Supplies = () => {
 
   const handleEditSupply = async (supplyData) => {
     try {
-      await updateSupply(selectedSupply.id, supplyData);
-      setShowEditModal(false);
-      setSelectedSupply(null);
+      const result = await updateSupply(selectedSupply.id, supplyData);
+      if (result.success) {
+        setShowEditModal(false);
+        setSelectedSupply(null);
+      }
     } catch (error) {
       console.error('Error updating supply:', error);
     }
@@ -85,21 +98,37 @@ const Supplies = () => {
   const handleDeleteSupply = async (supplyId) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este insumo?')) {
       try {
-        await deleteSupply(supplyId);
-        // Remover de selección si estaba seleccionado
-        setSelectedSupplies(prev => prev.filter(id => id !== supplyId));
+        const result = await deleteSupply(supplyId);
+        if (result.success) {
+          // Remover de selección si estaba seleccionado
+          setSelectedSupplies(prev => prev.filter(id => id !== supplyId));
+        }
       } catch (error) {
         console.error('Error deleting supply:', error);
       }
     }
   };
 
+  // Nueva función para manejar consumo (reemplaza recordConsumption)
   const handleRecordConsumption = async (consumptionData) => {
     try {
-      await recordConsumption(consumptionData);
-      setShowConsumptionModal(false);
-      setSelectedSupply(null);
-      setSelectedSupplies([]); // Limpiar selección después del consumo
+      // El consumo se maneja ajustando el stock hacia abajo
+      const supplyToUpdate = supplies.find(s => s.id === consumptionData.supplyId);
+      if (supplyToUpdate) {
+        const newStock = Math.max(0, supplyToUpdate.currentStock - consumptionData.quantity);
+        const result = await adjustStock(consumptionData.supplyId, {
+          newStock,
+          quantity: consumptionData.quantity,
+          reason: `Consumo: ${consumptionData.reason || 'Consumo registrado'}`,
+          type: 'consumption'
+        });
+        
+        if (result.success) {
+          setShowConsumptionModal(false);
+          setSelectedSupply(null);
+          setSelectedSupplies([]); // Limpiar selección después del consumo
+        }
+      }
     } catch (error) {
       console.error('Error recording consumption:', error);
     }
@@ -107,7 +136,10 @@ const Supplies = () => {
 
   const handleAdjustStock = async (supplyId, adjustment) => {
     try {
-      await adjustStock(supplyId, adjustment);
+      const result = await adjustStock(supplyId, adjustment);
+      if (!result.success) {
+        console.error('Error adjusting stock:', result.error);
+      }
     } catch (error) {
       console.error('Error adjusting stock:', error);
     }
@@ -123,7 +155,7 @@ const Supplies = () => {
     setShowConsumptionModal(true);
   };
 
-  // Función de filtrado mejorada
+  // Función de filtrado mejorada usando el hook unificado
   const filteredSupplies = useMemo(() => {
     if (!supplies) return [];
 
@@ -133,10 +165,10 @@ const Supplies = () => {
         const searchTerm = filters.search.toLowerCase();
         const matchesSearch = 
           supply.name.toLowerCase().includes(searchTerm) ||
-          supply.description.toLowerCase().includes(searchTerm) ||
-          supply.sku.toLowerCase().includes(searchTerm) ||
+          supply.description?.toLowerCase().includes(searchTerm) ||
+          supply.sku?.toLowerCase().includes(searchTerm) ||
           supply.category.toLowerCase().includes(searchTerm) ||
-          supply.supplier.toLowerCase().includes(searchTerm);
+          supply.supplier?.toLowerCase().includes(searchTerm);
         if (!matchesSearch) return false;
       }
 
@@ -169,7 +201,7 @@ const Supplies = () => {
           <p className="text-gray-600 mb-4">{error}</p>
           <Button 
             variant="primary" 
-            onClick={() => window.location.reload()}
+            onClick={() => refreshData()}
           >
             Reintentar
           </Button>
