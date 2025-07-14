@@ -28,6 +28,8 @@ import Supplies from './pages/Supplies/Supplies';
 import Reports from './pages/Reports/Reports';
 import Settings from './pages/Settings/Settings';
 
+import DebugConnection from './components/DebugConnection';
+
 import './index.css';
 
 // Componente para rutas protegidas mejorado
@@ -84,6 +86,7 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+<DebugConnection />
 // Componente para redirección automática según el rol
 const RoleBasedRedirect = () => {
   const { user, hasPermission, isReady } = useAuth();
