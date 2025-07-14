@@ -90,7 +90,10 @@ const CheckIn = () => {
       if (savedOrders && savedOrders[room.number]) {
         setSelectedRoom(room);
         setCurrentOrder(savedOrders[room.number]);
-        setOrderStep(2);
+        // MODIFICADO: Ir a paso 1 (snacks) en lugar de paso 2 (pago directo)
+        setOrderStep(1);
+        // Cargar los snacks existentes de la orden
+        setSelectedSnacks(savedOrders[room.number].snacks || []);
       }
     } else {
       // En modo checkin
@@ -250,24 +253,39 @@ const CheckIn = () => {
   const handleProcessPayment = (paymentMethod) => {
     if (!currentOrder) return;
     
-    alert(`Pago procesado exitosamente!\nHabitación: ${currentOrder.room.number}\nHuésped: ${currentOrder.guestName}\nTotal: $${currentOrder.total.toFixed(2)}\nMétodo: ${paymentMethod}\n\nCheck-out completado.`);
+    // NUEVO: Si estamos en checkout, actualizar la orden con snacks adicionales
+    let finalOrder = currentOrder;
+    if (checkoutMode) {
+      const additionalSnacksTotal = selectedSnacks.reduce((total, snack) => total + (snack.price * snack.quantity), 0);
+      const allSnacks = [...(currentOrder.snacks || []), ...selectedSnacks];
+      
+      finalOrder = {
+        ...currentOrder,
+        snacks: allSnacks,
+        total: currentOrder.roomPrice + 
+               (currentOrder.snacks || []).reduce((total, snack) => total + (snack.price * snack.quantity), 0) +
+               additionalSnacksTotal
+      };
+    }
+    
+    alert(`Pago procesado exitosamente!\nHabitación: ${finalOrder.room.number}\nHuésped: ${finalOrder.guestName}\nTotal: ${finalOrder.total.toFixed(2)}\nMétodo: ${paymentMethod}\n\nCheck-out completado.`);
     
     // Remover la orden guardada
     if (setSavedOrders && savedOrders) {
       const newSavedOrders = { ...savedOrders };
-      delete newSavedOrders[currentOrder.room.number];
+      delete newSavedOrders[finalOrder.room.number];
       setSavedOrders(newSavedOrders);
     }
     
-    // NUEVO: Remover de habitaciones limpiadas si estaba ahí
+    // Remover de habitaciones limpiadas si estaba ahí
     setCleanedRooms(prev => {
       const newSet = new Set(prev);
-      newSet.delete(currentOrder.room.number);
+      newSet.delete(finalOrder.room.number);
       return newSet;
     });
     
     // Marcar habitación como necesitando limpieza
-    setRoomsNeedingCleaning(prev => new Set(prev).add(currentOrder.room.number));
+    setRoomsNeedingCleaning(prev => new Set(prev).add(finalOrder.room.number));
     
     resetOrder();
   };
@@ -346,14 +364,15 @@ const CheckIn = () => {
             />
           )}
 
-          {/* Paso 1: Selección de Snacks */}
-          {orderStep === 1 && !checkoutMode && (
+          {/* Paso 1: Selección de Snacks - MODIFICADO para incluir checkout */}
+          {orderStep === 1 && (
             <SnackSelection
               currentOrder={currentOrder}
               selectedSnackType={selectedSnackType}
               selectedSnacks={selectedSnacks}
               snackTypes={snackTypes || []}
               snackItems={snackItems || {}}
+              checkoutMode={checkoutMode}
               onBack={() => setOrderStep(0)}
               onSnackTypeSelect={handleSnackTypeSelect}
               onSnackSelect={handleSnackSelect}
@@ -362,6 +381,7 @@ const CheckIn = () => {
               onConfirmOrder={handleConfirmOrder}
               onConfirmRoomOnly={handleConfirmRoomOnly}
               onCancelOrder={resetOrder}
+              onProceedToPayment={() => setOrderStep(2)}
             />
           )}
 
