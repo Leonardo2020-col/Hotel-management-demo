@@ -1,4 +1,4 @@
-// src/pages/CheckIn/CheckIn.jsx - CORREGIDO SIN ERRORES
+// src/pages/CheckIn/CheckIn.jsx - CORREGIDO CON LÓGICA DE LIMPIEZA
 import React, { useState } from 'react';
 import { LogIn, LogOut } from 'lucide-react';
 import Button from '../../components/common/Button';
@@ -28,7 +28,6 @@ const CheckIn = () => {
   } = useCheckInData();
 
   // Estado para manejar habitaciones que necesitan limpieza
-  // CORREGIDO: Inicializar después de obtener los datos
   const [roomsNeedingCleaning, setRoomsNeedingCleaning] = useState(() => {
     const cleaningRooms = new Set();
     
@@ -48,9 +47,17 @@ const CheckIn = () => {
     return cleaningRooms;
   });
 
-  // Función para determinar el estado real de la habitación
+  // NUEVO: Estado para habitaciones que han sido limpiadas (disponibles)
+  const [cleanedRooms, setCleanedRooms] = useState(new Set());
+
+  // MODIFICADA: Función para determinar el estado real de la habitación
   const getRoomActualStatus = (room) => {
     if (!room) return 'available';
+    
+    // NUEVO: Si la habitación fue marcada como limpia, ahora está disponible
+    if (cleanedRooms.has(room.number)) {
+      return 'available';
+    }
     
     // Verificar si necesita limpieza (prioridad más alta)
     if (roomsNeedingCleaning.has(room.number)) {
@@ -105,11 +112,19 @@ const CheckIn = () => {
     }
   };
 
-  // Función para manejar limpieza completada
+  // MODIFICADA: Función para manejar limpieza completada
   const handleRoomCleaned = (roomNumber) => {
+    // Remover de habitaciones que necesitan limpieza
     setRoomsNeedingCleaning(prev => {
       const newSet = new Set(prev);
       newSet.delete(roomNumber);
+      return newSet;
+    });
+    
+    // NUEVO: Agregar a habitaciones limpiadas (disponibles)
+    setCleanedRooms(prev => {
+      const newSet = new Set(prev);
+      newSet.add(roomNumber);
       return newSet;
     });
     
@@ -164,7 +179,7 @@ const CheckIn = () => {
     }
   };
 
-  // Agregar orden a savedOrders al confirmar
+  // MODIFICADA: Agregar orden a savedOrders al confirmar
   const handleConfirmOrder = () => {
     if (!currentOrder) return;
     
@@ -186,12 +201,19 @@ const CheckIn = () => {
       }));
     }
     
+    // NUEVO: Limpiar estado de habitación limpiada al hacer check-in
+    setCleanedRooms(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(finalOrder.room.number);
+      return newSet;
+    });
+    
     console.log('Orden confirmada:', finalOrder);
     alert(`Check-in completado!\nHabitación: ${finalOrder.room.number}\nPrecio habitación: $${finalOrder.roomPrice.toFixed(2)}\nSnacks: $${snacksTotal.toFixed(2)}\nTotal: $${finalOrder.total.toFixed(2)}`);
     resetOrder();
   };
 
-  // Agregar orden a savedOrders al confirmar solo habitación
+  // MODIFICADA: Agregar orden a savedOrders al confirmar solo habitación
   const handleConfirmRoomOnly = () => {
     if (!currentOrder) return;
     
@@ -212,12 +234,19 @@ const CheckIn = () => {
       }));
     }
     
+    // NUEVO: Limpiar estado de habitación limpiada al hacer check-in
+    setCleanedRooms(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(finalOrder.room.number);
+      return newSet;
+    });
+    
     console.log('Habitación confirmada sin snacks:', finalOrder);
     alert(`Check-in completado!\nHabitación: ${finalOrder.room.number}\nTotal: $${finalOrder.total.toFixed(2)}`);
     resetOrder();
   };
 
-  // Manejar checkout y marcar habitación para limpieza
+  // MODIFICADA: Manejar checkout y marcar habitación para limpieza
   const handleProcessPayment = (paymentMethod) => {
     if (!currentOrder) return;
     
@@ -229,6 +258,13 @@ const CheckIn = () => {
       delete newSavedOrders[currentOrder.room.number];
       setSavedOrders(newSavedOrders);
     }
+    
+    // NUEVO: Remover de habitaciones limpiadas si estaba ahí
+    setCleanedRooms(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(currentOrder.room.number);
+      return newSet;
+    });
     
     // Marcar habitación como necesitando limpieza
     setRoomsNeedingCleaning(prev => new Set(prev).add(currentOrder.room.number));
