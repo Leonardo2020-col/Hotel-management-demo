@@ -1,37 +1,55 @@
-// src/lib/supabase.js - CONFIGURACIÓN CORREGIDA PARA REACT (CREATE REACT APP)
+// src/lib/supabase.js - CONFIGURACIÓN FINAL PARA VITE
 import { createClient } from '@supabase/supabase-js'
 
-// Configuración de Supabase para React
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+// Configuración de Supabase para VITE (no React)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Validación de variables de entorno
-if (!supabaseUrl) {
-  console.error('❌ REACT_APP_SUPABASE_URL no está definida en las variables de entorno')
-  console.log('💡 Agrega REACT_APP_SUPABASE_URL=tu_url_de_supabase en tu archivo .env')
-}
+// MODO DESARROLLO: Si no están las variables, usar valores por defecto
+const isDevelopment = import.meta.env.DEV
+const hasConfig = supabaseUrl && supabaseAnonKey
 
-if (!supabaseAnonKey) {
-  console.error('❌ REACT_APP_SUPABASE_ANON_KEY no está definida en las variables de entorno')
-  console.log('💡 Agrega REACT_APP_SUPABASE_ANON_KEY=tu_anon_key en tu archivo .env')
+// Configuración por defecto para desarrollo sin variables
+const defaultUrl = 'https://demo.supabase.co'
+const defaultKey = 'demo-anon-key'
+
+// Usar configuración real o por defecto
+const finalUrl = hasConfig ? supabaseUrl : defaultUrl
+const finalKey = hasConfig ? supabaseAnonKey : defaultKey
+
+// Log de configuración
+if (isDevelopment) {
+  console.log('🔧 Configuración de Supabase para Vite:')
+  console.log('URL:', supabaseUrl ? '✅ Configurada' : '❌ No configurada (usando demo)')
+  console.log('Anon Key:', supabaseAnonKey ? '✅ Configurada' : '❌ No configurada (usando demo)')
+  
+  if (!hasConfig) {
+    console.log('\n💡 Para configurar Supabase en Vite:')
+    console.log('1. Crea un archivo .env en la raíz del proyecto')
+    console.log('2. Agrega las siguientes líneas:')
+    console.log('   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co')
+    console.log('   VITE_SUPABASE_ANON_KEY=tu_anon_key')
+    console.log('3. Reinicia el servidor de desarrollo (npm run dev)')
+    console.log('\n🎯 Por ahora funcionará con datos de demostración')
+  }
 }
 
 // Crear cliente de Supabase con configuración robusta
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(finalUrl, finalKey, {
   auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
+    autoRefreshToken: hasConfig,
+    persistSession: hasConfig,
+    detectSessionInUrl: hasConfig,
     flowType: 'pkce'
   },
   realtime: {
     params: {
-      eventsPerSecond: 10
+      eventsPerSecond: hasConfig ? 10 : 0
     }
   },
   global: {
     headers: {
-      'X-Client-Info': 'hotel-management-react'
+      'X-Client-Info': 'hotel-management-vite'
     }
   }
 })
@@ -58,8 +76,15 @@ export const handleAuthError = (error) => {
   return { success: false, error: error.message }
 }
 
-// Función helper para verificar autenticación antes de operaciones
+// Función helper para verificar si tenemos configuración válida
+export const hasValidConfig = () => hasConfig
+
+// Función helper para verificar autenticación
 export const checkAuth = async () => {
+  if (!hasConfig) {
+    return { success: true, session: null, authenticated: false, demo: true }
+  }
+  
   try {
     const { data: { session }, error } = await supabase.auth.getSession()
     if (error) throw error
@@ -71,6 +96,11 @@ export const checkAuth = async () => {
 
 // Función helper para queries con manejo de errores robusto
 export const safeQuery = async (queryFn, requireAuth = false) => {
+  // Si no tenemos configuración válida, retornar error inmediatamente
+  if (!hasConfig) {
+    return { data: null, error: 'No valid Supabase configuration', demo: true }
+  }
+  
   try {
     if (requireAuth) {
       const authCheck = await checkAuth()
@@ -92,6 +122,11 @@ export const safeQuery = async (queryFn, requireAuth = false) => {
 export const rooms = {
   // Obtener todas las habitaciones
   getAll: async () => {
+    if (!hasConfig) {
+      console.log('📄 Usando datos de demostración para habitaciones')
+      return { data: getFallbackRooms(), error: null, demo: true }
+    }
+    
     try {
       const { data, error } = await supabase
         .from('rooms')
@@ -110,31 +145,13 @@ export const rooms = {
     }
   },
 
-  // Obtener habitaciones por piso
-  getByFloor: async (floor) => {
-    try {
-      const { data, error } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('floor', floor)
-        .order('number')
-      
-      if (error) {
-        const fallbackData = getFallbackRooms().filter(room => 
-          Math.floor((room.number - 1) / 100) + 1 === floor
-        )
-        return { data: fallbackData, error: null, fallback: true }
-      }
-      
-      return { data, error: null }
-    } catch (error) {
-      console.error('Error obteniendo habitaciones por piso:', error)
-      return { data: [], error: error.message }
-    }
-  },
-
   // Actualizar estado de habitación
   updateStatus: async (roomNumber, status) => {
+    if (!hasConfig) {
+      console.log(`📄 DEMO: Actualizando habitación ${roomNumber} a ${status}`)
+      return { data: [{ number: roomNumber, status }], error: null, demo: true }
+    }
+    
     return await safeQuery(async () => {
       const { data, error } = await supabase
         .from('rooms')
@@ -152,6 +169,11 @@ export const rooms = {
 export const services = {
   // Obtener todos los servicios
   getAll: async () => {
+    if (!hasConfig) {
+      console.log('📄 Usando datos de demostración para servicios')
+      return { data: getFallbackServices(), error: null, demo: true }
+    }
+    
     try {
       const { data, error } = await supabase
         .from('services')
@@ -173,6 +195,11 @@ export const services = {
 
   // Obtener tipos de servicios
   getTypes: async () => {
+    if (!hasConfig) {
+      console.log('📄 Usando tipos de servicios de demostración')
+      return { data: getFallbackServiceTypes(), error: null, demo: true }
+    }
+    
     try {
       const { data, error } = await supabase
         .from('service_types')
@@ -189,28 +216,6 @@ export const services = {
       console.error('Error obteniendo tipos de servicios:', error)
       return { data: getFallbackServiceTypes(), error: error.message, fallback: true }
     }
-  },
-
-  // Obtener servicios por tipo
-  getByType: async (typeId) => {
-    try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('type_id', typeId)
-        .eq('available', true)
-        .order('name')
-      
-      if (error) {
-        const fallbackData = getFallbackServices().filter(service => service.type_id === typeId)
-        return { data: fallbackData, error: null, fallback: true }
-      }
-      
-      return { data, error: null }
-    } catch (error) {
-      console.error('Error obteniendo servicios por tipo:', error)
-      return { data: [], error: error.message }
-    }
   }
 }
 
@@ -218,6 +223,11 @@ export const services = {
 export const orders = {
   // Obtener órdenes activas
   getActive: async () => {
+    if (!hasConfig) {
+      console.log('📄 No hay órdenes en modo demostración')
+      return { data: [], error: null, demo: true }
+    }
+    
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -247,28 +257,23 @@ export const orders = {
 
   // Crear nueva orden
   create: async (orderData) => {
+    if (!hasConfig) {
+      console.log('📄 DEMO: Creando orden local:', orderData)
+      return { 
+        data: { 
+          id: Date.now(), 
+          ...orderData, 
+          created_at: new Date().toISOString() 
+        }, 
+        error: null, 
+        demo: true 
+      }
+    }
+    
     return await safeQuery(async () => {
       const { data, error } = await supabase
         .from('orders')
         .insert([orderData])
-        .select()
-      
-      if (error) throw error
-      return { data, error: null }
-    })
-  },
-
-  // Completar orden (checkout)
-  complete: async (orderId, checkoutData = {}) => {
-    return await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('orders')
-        .update({ 
-          status: 'completed',
-          check_out_time: new Date().toISOString(),
-          ...checkoutData
-        })
-        .eq('id', orderId)
         .select()
       
       if (error) throw error
@@ -279,11 +284,10 @@ export const orders = {
 
 // ==================== DATOS DE FALLBACK ====================
 
-// Datos de habitaciones de fallback para cuando Supabase no funciona
 const getFallbackRooms = () => {
   const rooms = []
   
-  // Piso 1 - Standard
+  // Piso 1 - Standard (101-112)
   for (let i = 1; i <= 12; i++) {
     rooms.push({
       id: i,
@@ -293,11 +297,11 @@ const getFallbackRooms = () => {
       status: i === 3 ? 'occupied' : i === 7 ? 'checkout' : 'available',
       price: 80.00,
       capacity: 2,
-      amenities: ['WiFi', 'TV', 'Aire Acondicionado']
+      amenities: ['WiFi', 'TV', 'A/C']
     })
   }
   
-  // Piso 2 - Deluxe
+  // Piso 2 - Deluxe (201-212)
   for (let i = 1; i <= 12; i++) {
     rooms.push({
       id: 12 + i,
@@ -307,11 +311,11 @@ const getFallbackRooms = () => {
       status: i === 2 || i === 9 ? 'occupied' : i === 5 ? 'checkout' : 'available',
       price: 95.00,
       capacity: 2,
-      amenities: ['WiFi', 'TV', 'Aire Acondicionado', 'Minibar']
+      amenities: ['WiFi', 'TV', 'A/C', 'Minibar']
     })
   }
   
-  // Piso 3 - Suite
+  // Piso 3 - Suite (301-312)
   for (let i = 1; i <= 12; i++) {
     rooms.push({
       id: 24 + i,
@@ -321,14 +325,13 @@ const getFallbackRooms = () => {
       status: i === 4 ? 'occupied' : i === 6 ? 'checkout' : 'available',
       price: 110.00,
       capacity: 4,
-      amenities: ['WiFi', 'TV', 'Aire Acondicionado', 'Minibar', 'Jacuzzi']
+      amenities: ['WiFi', 'TV', 'A/C', 'Minibar', 'Jacuzzi']
     })
   }
   
   return rooms
 }
 
-// Datos de tipos de servicios de fallback
 const getFallbackServiceTypes = () => [
   { id: 'frutas', name: 'FRUTAS', description: 'Frutas frescas y naturales', active: true },
   { id: 'bebidas', name: 'BEBIDAS', description: 'Bebidas frías y calientes', active: true },
@@ -336,7 +339,6 @@ const getFallbackServiceTypes = () => [
   { id: 'postres', name: 'POSTRES', description: 'Dulces y postres', active: true }
 ]
 
-// Datos de servicios de fallback
 const getFallbackServices = () => [
   // Frutas
   { id: 1, name: 'Manzana', price: 2.50, type_id: 'frutas', stock_quantity: 50, available: true, category: 'frutas' },
@@ -366,6 +368,12 @@ const getFallbackServices = () => [
 // ==================== UTILIDADES ====================
 
 export const utils = {
+  // Verificar si tenemos configuración válida
+  hasValidConfig: () => hasConfig,
+  
+  // Verificar si estamos en modo demo
+  isDemoMode: () => !hasConfig,
+  
   // Formatear error de Supabase
   formatError: (error) => {
     if (!error) return null
@@ -383,12 +391,12 @@ export const utils = {
 
   // Verificar conexión
   testConnection: async () => {
-    try {
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.error('❌ Variables de entorno no configuradas')
-        return false
-      }
+    if (!hasConfig) {
+      console.log('📄 Modo demostración - no hay configuración de Supabase')
+      return false
+    }
 
+    try {
       const { data, error } = await supabase
         .from('rooms')
         .select('count', { count: 'exact', head: true })
@@ -406,31 +414,26 @@ export const utils = {
     }
   },
 
-  // Log de configuración
-  logConfig: () => {
-    console.log('🔧 Configuración de Supabase para React:')
-    console.log('URL:', supabaseUrl ? '✅ Configurada' : '❌ No configurada')
-    console.log('Anon Key:', supabaseAnonKey ? '✅ Configurada' : '❌ No configurada')
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.log('\n💡 Para configurar Supabase en React:')
-      console.log('1. Crea un archivo .env en la raíz del proyecto')
-      console.log('2. Agrega las siguientes líneas:')
-      console.log('   REACT_APP_SUPABASE_URL=https://tu-proyecto.supabase.co')
-      console.log('   REACT_APP_SUPABASE_ANON_KEY=tu_anon_key')
-      console.log('3. Reinicia el servidor de desarrollo (npm start)')
-    }
-  },
-
-  // Verificar si está en modo desarrollo
-  isDevelopment: () => process.env.NODE_ENV === 'development'
+  // Obtener información del entorno
+  getEnvInfo: () => ({
+    hasConfig,
+    url: supabaseUrl,
+    hasAnonKey: !!supabaseAnonKey,
+    mode: import.meta.env.MODE,
+    dev: import.meta.env.DEV
+  })
 }
 
 // ==================== TIEMPO REAL ====================
 
 export const realtime = {
-  // Suscribirse a cambios en habitaciones
+  // Suscribirse a cambios (solo si tenemos configuración válida)
   subscribeToRooms: (callback) => {
+    if (!hasConfig) {
+      console.log('📄 Realtime no disponible en modo demo')
+      return null
+    }
+    
     try {
       return supabase
         .channel('rooms_changes')
@@ -445,8 +448,12 @@ export const realtime = {
     }
   },
 
-  // Suscribirse a cambios en órdenes
   subscribeToOrders: (callback) => {
+    if (!hasConfig) {
+      console.log('📄 Realtime no disponible en modo demo')
+      return null
+    }
+    
     try {
       return supabase
         .channel('orders_changes')
@@ -461,7 +468,6 @@ export const realtime = {
     }
   },
 
-  // Cancelar suscripción
   unsubscribe: (channel) => {
     try {
       if (channel) {
@@ -473,63 +479,13 @@ export const realtime = {
   }
 }
 
-// Verificar configuración al importar solo en desarrollo
-if (process.env.NODE_ENV === 'development') {
-  utils.logConfig()
-  // Test de conexión en desarrollo
+// Test de conexión al cargar (solo en desarrollo)
+if (isDevelopment && hasConfig) {
   setTimeout(() => {
     utils.testConnection()
   }, 1000)
 }
 
 // Exportaciones para compatibilidad
-export const auth = {
-  signIn: async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-      return handleAuthError(error) ? { data, error: null } : { data: null, error }
-    } catch (error) {
-      console.error('Error en signIn:', error)
-      return { data: null, error: error.message }
-    }
-  },
-
-  signOut: async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      return { error: error?.message || null }
-    } catch (error) {
-      console.error('Error en signOut:', error)
-      return { error: error.message }
-    }
-  },
-
-  getCurrentUser: async () => {
-    try {
-      const { data, error } = await supabase.auth.getUser()
-      return handleAuthError(error) ? { data, error: null } : { data: null, error }
-    } catch (error) {
-      return { data: null, error: error.message }
-    }
-  },
-
-  getCurrentSession: async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession()
-      return handleAuthError(error) ? { data, error: null } : { data: null, error }
-    } catch (error) {
-      return { data: null, error: error.message }
-    }
-  },
-
-  onAuthStateChange: (callback) => {
-    return supabase.auth.onAuthStateChange(callback)
-  }
-}
-
-// Exportar alias para compatibilidad
-export { services as snacks }
 export { supabase as default }
+export { services as snacks }
