@@ -586,3 +586,15 @@ if (process.env.NODE_ENV === 'development') {
 
 // Exportar cliente principal
 export default supabase
+
+// Al final del archivo, agregar para debug
+console.log('🔧 Supabase Config Check:');
+console.log('URL:', process.env.REACT_APP_SUPABASE_URL);
+console.log('Key present:', !!process.env.REACT_APP_SUPABASE_ANON_KEY);
+
+// Test de conexión inmediato
+if (process.env.REACT_APP_SUPABASE_URL && process.env.REACT_APP_SUPABASE_ANON_KEY) {
+  console.log('✅ Variables de entorno presentes');
+} else {
+  console.error('❌ Variables de entorno faltantes');
+}
