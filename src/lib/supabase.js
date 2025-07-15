@@ -1,491 +1,488 @@
-// src/lib/supabase.js - CONFIGURACIÓN FINAL PARA VITE
+// src/lib/supabase.js - CONFIGURACIÓN COMPLETA DE SUPABASE
 import { createClient } from '@supabase/supabase-js'
 
-// Configuración de Supabase para VITE (no React)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Configuración de Supabase
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY
 
-// MODO DESARROLLO: Si no están las variables, usar valores por defecto
-const isDevelopment = import.meta.env.DEV
-const hasConfig = supabaseUrl && supabaseAnonKey
-
-// Configuración por defecto para desarrollo sin variables
-const defaultUrl = 'https://demo.supabase.co'
-const defaultKey = 'demo-anon-key'
-
-// Usar configuración real o por defecto
-const finalUrl = hasConfig ? supabaseUrl : defaultUrl
-const finalKey = hasConfig ? supabaseAnonKey : defaultKey
-
-// Log de configuración
-if (isDevelopment) {
-  console.log('🔧 Configuración de Supabase para Vite:')
-  console.log('URL:', supabaseUrl ? '✅ Configurada' : '❌ No configurada (usando demo)')
-  console.log('Anon Key:', supabaseAnonKey ? '✅ Configurada' : '❌ No configurada (usando demo)')
-  
-  if (!hasConfig) {
-    console.log('\n💡 Para configurar Supabase en Vite:')
-    console.log('1. Crea un archivo .env en la raíz del proyecto')
-    console.log('2. Agrega las siguientes líneas:')
-    console.log('   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co')
-    console.log('   VITE_SUPABASE_ANON_KEY=tu_anon_key')
-    console.log('3. Reinicia el servidor de desarrollo (npm run dev)')
-    console.log('\n🎯 Por ahora funcionará con datos de demostración')
-  }
+// Validación de variables de entorno
+if (!supabaseUrl) {
+  console.error('❌ REACT_APP_SUPABASE_URL no está definida en las variables de entorno')
+  console.log('💡 Agrega REACT_APP_SUPABASE_URL=tu_url_de_supabase en tu archivo .env')
 }
 
-// Crear cliente de Supabase con configuración robusta
-export const supabase = createClient(finalUrl, finalKey, {
+if (!supabaseAnonKey) {
+  console.error('❌ REACT_APP_SUPABASE_ANON_KEY no está definida en las variables de entorno')
+  console.log('💡 Agrega REACT_APP_SUPABASE_ANON_KEY=tu_anon_key en tu archivo .env')
+}
+
+// Crear cliente de Supabase
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: hasConfig,
-    persistSession: hasConfig,
-    detectSessionInUrl: hasConfig,
-    flowType: 'pkce'
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
   },
   realtime: {
     params: {
-      eventsPerSecond: hasConfig ? 10 : 0
-    }
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'hotel-management-vite'
+      eventsPerSecond: 10
     }
   }
 })
 
-// ==================== FUNCIONES HELPER MEJORADAS ====================
+// Funciones helper para operaciones comunes
 
-// Función helper para manejar errores de autenticación
-export const handleAuthError = (error) => {
-  if (!error) return { success: true }
-  
-  if (error?.message?.includes('401') || error?.message?.includes('unauthorized')) {
-    console.warn('Authentication required for this operation')
-    return { success: false, error: 'Authentication required', needsAuth: true }
-  }
-  
-  if (error?.code === 'PGRST116') {
-    return { success: false, error: 'No se encontraron resultados', notFound: true }
-  }
-  
-  if (error?.code === '42P01') {
-    return { success: false, error: 'Tabla no existe en la base de datos', tableNotFound: true }
-  }
-  
-  return { success: false, error: error.message }
-}
+// ==================== AUTENTICACIÓN ====================
 
-// Función helper para verificar si tenemos configuración válida
-export const hasValidConfig = () => hasConfig
-
-// Función helper para verificar autenticación
-export const checkAuth = async () => {
-  if (!hasConfig) {
-    return { success: true, session: null, authenticated: false, demo: true }
-  }
-  
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession()
-    if (error) throw error
-    return { success: true, session, authenticated: !!session }
-  } catch (error) {
-    return { success: false, error: error.message, authenticated: false }
-  }
-}
-
-// Función helper para queries con manejo de errores robusto
-export const safeQuery = async (queryFn, requireAuth = false) => {
-  // Si no tenemos configuración válida, retornar error inmediatamente
-  if (!hasConfig) {
-    return { data: null, error: 'No valid Supabase configuration', demo: true }
-  }
-  
-  try {
-    if (requireAuth) {
-      const authCheck = await checkAuth()
-      if (!authCheck.authenticated) {
-        return { data: null, error: 'Authentication required' }
-      }
+export const auth = {
+  // Iniciar sesión
+  signIn: async (email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+      return { data, error }
+    } catch (error) {
+      console.error('Error en signIn:', error)
+      return { data: null, error }
     }
-    
-    return await queryFn()
-  } catch (error) {
-    console.error('Query error:', error)
-    return { data: null, error: error.message }
+  },
+
+  // Registrar usuario
+  signUp: async (email, password, metadata = {}) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata
+        }
+      })
+      return { data, error }
+    } catch (error) {
+      console.error('Error en signUp:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Cerrar sesión
+  signOut: async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      return { error }
+    } catch (error) {
+      console.error('Error en signOut:', error)
+      return { error }
+    }
+  },
+
+  // Obtener usuario actual
+  getCurrentUser: () => {
+    return supabase.auth.getUser()
+  },
+
+  // Obtener sesión actual
+  getCurrentSession: () => {
+    return supabase.auth.getSession()
+  },
+
+  // Escuchar cambios de autenticación
+  onAuthStateChange: (callback) => {
+    return supabase.auth.onAuthStateChange(callback)
   }
 }
 
-// ==================== FUNCIONES ESPECÍFICAS PARA EL SISTEMA ====================
+// ==================== HABITACIONES ====================
 
-// Habitaciones con fallback robusto
 export const rooms = {
   // Obtener todas las habitaciones
   getAll: async () => {
-    if (!hasConfig) {
-      console.log('📄 Usando datos de demostración para habitaciones')
-      return { data: getFallbackRooms(), error: null, demo: true }
-    }
-    
     try {
       const { data, error } = await supabase
         .from('rooms')
         .select('*')
         .order('number')
-      
-      if (error) {
-        console.warn('Error obteniendo habitaciones de Supabase, usando fallback:', error)
-        return { data: getFallbackRooms(), error: null, fallback: true }
-      }
-      
-      return { data, error: null }
+      return { data, error }
     } catch (error) {
       console.error('Error obteniendo habitaciones:', error)
-      return { data: getFallbackRooms(), error: error.message, fallback: true }
+      return { data: null, error }
+    }
+  },
+
+  // Obtener habitaciones por piso
+  getByFloor: async (floor) => {
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('floor', floor)
+        .order('number')
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo habitaciones por piso:', error)
+      return { data: null, error }
     }
   },
 
   // Actualizar estado de habitación
   updateStatus: async (roomNumber, status) => {
-    if (!hasConfig) {
-      console.log(`📄 DEMO: Actualizando habitación ${roomNumber} a ${status}`)
-      return { data: [{ number: roomNumber, status }], error: null, demo: true }
-    }
-    
-    return await safeQuery(async () => {
+    try {
       const { data, error } = await supabase
         .from('rooms')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('number', roomNumber)
         .select()
-      
-      if (error) throw error
-      return { data, error: null }
-    })
-  }
-}
-
-// Servicios/snacks con fallback
-export const services = {
-  // Obtener todos los servicios
-  getAll: async () => {
-    if (!hasConfig) {
-      console.log('📄 Usando datos de demostración para servicios')
-      return { data: getFallbackServices(), error: null, demo: true }
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('available', true)
-        .order('name')
-      
-      if (error) {
-        console.warn('Error obteniendo servicios, usando fallback:', error)
-        return { data: getFallbackServices(), error: null, fallback: true }
-      }
-      
-      return { data, error: null }
+      return { data, error }
     } catch (error) {
-      console.error('Error obteniendo servicios:', error)
-      return { data: getFallbackServices(), error: error.message, fallback: true }
+      console.error('Error actualizando estado de habitación:', error)
+      return { data: null, error }
     }
   },
 
-  // Obtener tipos de servicios
-  getTypes: async () => {
-    if (!hasConfig) {
-      console.log('📄 Usando tipos de servicios de demostración')
-      return { data: getFallbackServiceTypes(), error: null, demo: true }
-    }
-    
+  // Crear nueva habitación
+  create: async (roomData) => {
     try {
       const { data, error } = await supabase
-        .from('service_types')
-        .select('*')
-        .eq('active', true)
-        .order('name')
-      
-      if (error) {
-        return { data: getFallbackServiceTypes(), error: null, fallback: true }
-      }
-      
-      return { data, error: null }
+        .from('rooms')
+        .insert([roomData])
+        .select()
+      return { data, error }
     } catch (error) {
-      console.error('Error obteniendo tipos de servicios:', error)
-      return { data: getFallbackServiceTypes(), error: error.message, fallback: true }
+      console.error('Error creando habitación:', error)
+      return { data: null, error }
     }
   }
 }
 
-// Órdenes con manejo robusto
+// ==================== ÓRDENES/RESERVAS ====================
+
 export const orders = {
   // Obtener órdenes activas
   getActive: async () => {
-    if (!hasConfig) {
-      console.log('📄 No hay órdenes en modo demostración')
-      return { data: [], error: null, demo: true }
-    }
-    
     try {
       const { data, error } = await supabase
         .from('orders')
         .select(`
           *,
-          order_services (
+          order_snacks (
             quantity,
-            unit_price,
-            total_price,
-            services (id, name)
+            price,
+            snacks (id, name, price)
           )
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-      
-      if (error) {
-        console.warn('Error obteniendo órdenes activas:', error)
-        return { data: [], error: null, fallback: true }
-      }
-      
-      return { data, error: null }
+      return { data, error }
     } catch (error) {
       console.error('Error obteniendo órdenes activas:', error)
-      return { data: [], error: error.message }
+      return { data: null, error }
     }
   },
 
   // Crear nueva orden
   create: async (orderData) => {
-    if (!hasConfig) {
-      console.log('📄 DEMO: Creando orden local:', orderData)
-      return { 
-        data: { 
-          id: Date.now(), 
-          ...orderData, 
-          created_at: new Date().toISOString() 
-        }, 
-        error: null, 
-        demo: true 
-      }
-    }
-    
-    return await safeQuery(async () => {
+    try {
       const { data, error } = await supabase
         .from('orders')
         .insert([orderData])
         .select()
-      
-      if (error) throw error
-      return { data, error: null }
-    })
+      return { data, error }
+    } catch (error) {
+      console.error('Error creando orden:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Completar orden (checkout)
+  complete: async (orderId, checkoutData = {}) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'completed',
+          check_out_time: new Date().toISOString(),
+          ...checkoutData
+        })
+        .eq('id', orderId)
+        .select()
+      return { data, error }
+    } catch (error) {
+      console.error('Error completando orden:', error)
+      return { data: null, error }
+    }
   }
 }
 
-// ==================== DATOS DE FALLBACK ====================
+// ==================== SNACKS/PRODUCTOS ====================
 
-const getFallbackRooms = () => {
-  const rooms = []
-  
-  // Piso 1 - Standard (101-112)
-  for (let i = 1; i <= 12; i++) {
-    rooms.push({
-      id: i,
-      number: 100 + i,
-      floor: 1,
-      type: 'standard',
-      status: i === 3 ? 'occupied' : i === 7 ? 'checkout' : 'available',
-      price: 80.00,
-      capacity: 2,
-      amenities: ['WiFi', 'TV', 'A/C']
-    })
+export const snacks = {
+  // Obtener todos los snacks
+  getAll: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('snacks')
+        .select('*')
+        .eq('available', true)
+        .order('name')
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo snacks:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Obtener tipos de snacks
+  getTypes: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('snack_types')
+        .select('*')
+        .order('name')
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo tipos de snacks:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Obtener snacks por tipo
+  getByType: async (typeId) => {
+    try {
+      const { data, error } = await supabase
+        .from('snacks')
+        .select('*')
+        .eq('type_id', typeId)
+        .eq('available', true)
+        .order('name')
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo snacks por tipo:', error)
+      return { data: null, error }
+    }
   }
-  
-  // Piso 2 - Deluxe (201-212)
-  for (let i = 1; i <= 12; i++) {
-    rooms.push({
-      id: 12 + i,
-      number: 200 + i,
-      floor: 2,
-      type: 'deluxe',
-      status: i === 2 || i === 9 ? 'occupied' : i === 5 ? 'checkout' : 'available',
-      price: 95.00,
-      capacity: 2,
-      amenities: ['WiFi', 'TV', 'A/C', 'Minibar']
-    })
-  }
-  
-  // Piso 3 - Suite (301-312)
-  for (let i = 1; i <= 12; i++) {
-    rooms.push({
-      id: 24 + i,
-      number: 300 + i,
-      floor: 3,
-      type: 'suite',
-      status: i === 4 ? 'occupied' : i === 6 ? 'checkout' : 'available',
-      price: 110.00,
-      capacity: 4,
-      amenities: ['WiFi', 'TV', 'A/C', 'Minibar', 'Jacuzzi']
-    })
-  }
-  
-  return rooms
 }
 
-const getFallbackServiceTypes = () => [
-  { id: 'frutas', name: 'FRUTAS', description: 'Frutas frescas y naturales', active: true },
-  { id: 'bebidas', name: 'BEBIDAS', description: 'Bebidas frías y calientes', active: true },
-  { id: 'snacks', name: 'SNACKS', description: 'Bocadillos y aperitivos', active: true },
-  { id: 'postres', name: 'POSTRES', description: 'Dulces y postres', active: true }
-]
+// ==================== HUÉSPEDES ====================
 
-const getFallbackServices = () => [
-  // Frutas
-  { id: 1, name: 'Manzana', price: 2.50, type_id: 'frutas', stock_quantity: 50, available: true, category: 'frutas' },
-  { id: 2, name: 'Plátano', price: 1.50, type_id: 'frutas', stock_quantity: 30, available: true, category: 'frutas' },
-  { id: 3, name: 'Naranja', price: 2.00, type_id: 'frutas', stock_quantity: 40, available: true, category: 'frutas' },
-  { id: 4, name: 'Uvas', price: 4.00, type_id: 'frutas', stock_quantity: 25, available: true, category: 'frutas' },
-  
-  // Bebidas
-  { id: 6, name: 'Agua', price: 1.00, type_id: 'bebidas', stock_quantity: 100, available: true, category: 'bebidas' },
-  { id: 7, name: 'Coca Cola', price: 2.50, type_id: 'bebidas', stock_quantity: 80, available: true, category: 'bebidas' },
-  { id: 8, name: 'Jugo de naranja', price: 3.00, type_id: 'bebidas', stock_quantity: 60, available: true, category: 'bebidas' },
-  { id: 9, name: 'Café', price: 2.00, type_id: 'bebidas', stock_quantity: 45, available: true, category: 'bebidas' },
-  
-  // Snacks
-  { id: 11, name: 'Papas fritas', price: 3.50, type_id: 'snacks', stock_quantity: 40, available: true, category: 'snacks' },
-  { id: 12, name: 'Galletas', price: 2.00, type_id: 'snacks', stock_quantity: 35, available: true, category: 'snacks' },
-  { id: 13, name: 'Nueces', price: 4.50, type_id: 'snacks', stock_quantity: 30, available: true, category: 'snacks' },
-  { id: 14, name: 'Chocolate', price: 3.00, type_id: 'snacks', stock_quantity: 25, available: true, category: 'snacks' },
-  
-  // Postres
-  { id: 16, name: 'Helado', price: 4.00, type_id: 'postres', stock_quantity: 30, available: true, category: 'postres' },
-  { id: 17, name: 'Torta', price: 5.50, type_id: 'postres', stock_quantity: 18, available: true, category: 'postres' },
-  { id: 18, name: 'Flan', price: 3.50, type_id: 'postres', stock_quantity: 22, available: true, category: 'postres' },
-  { id: 19, name: 'Brownie', price: 4.50, type_id: 'postres', stock_quantity: 20, available: true, category: 'postres' }
-]
+export const guests = {
+  // Obtener todos los huéspedes
+  getAll: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('guests')
+        .select('*')
+        .order('created_at', { ascending: false })
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo huéspedes:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Crear nuevo huésped
+  create: async (guestData) => {
+    try {
+      const { data, error } = await supabase
+        .from('guests')
+        .insert([guestData])
+        .select()
+      return { data, error }
+    } catch (error) {
+      console.error('Error creando huésped:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Buscar huésped por DNI o email
+  search: async (query) => {
+    try {
+      const { data, error } = await supabase
+        .from('guests')
+        .select('*')
+        .or(`dni.ilike.%${query}%,email.ilike.%${query}%,full_name.ilike.%${query}%`)
+        .order('full_name')
+      return { data, error }
+    } catch (error) {
+      console.error('Error buscando huésped:', error)
+      return { data: null, error }
+    }
+  }
+}
+
+// ==================== REPORTES Y ANALYTICS ====================
+
+export const analytics = {
+  // Obtener ocupación por período
+  getOccupancy: async (startDate, endDate) => {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_occupancy_stats', {
+          start_date: startDate,
+          end_date: endDate
+        })
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo estadísticas de ocupación:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Obtener ingresos por período
+  getRevenue: async (startDate, endDate) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('total, created_at, check_in_date')
+        .gte('check_in_date', startDate)
+        .lte('check_in_date', endDate)
+        .eq('status', 'completed')
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo ingresos:', error)
+      return { data: null, error }
+    }
+  }
+}
+
+// ==================== TIEMPO REAL ====================
+
+export const realtime = {
+  // Suscribirse a cambios en habitaciones
+  subscribeToRooms: (callback) => {
+    return supabase
+      .channel('rooms')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'rooms' },
+        callback
+      )
+      .subscribe()
+  },
+
+  // Suscribirse a cambios en órdenes
+  subscribeToOrders: (callback) => {
+    return supabase
+      .channel('orders')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        callback
+      )
+      .subscribe()
+  },
+
+  // Cancelar suscripción
+  unsubscribe: (channel) => {
+    return supabase.removeChannel(channel)
+  }
+}
+
+// ==================== STORAGE (ARCHIVOS) ====================
+
+export const storage = {
+  // Subir archivo
+  upload: async (bucket, path, file) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(path, file)
+      return { data, error }
+    } catch (error) {
+      console.error('Error subiendo archivo:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Obtener URL pública del archivo
+  getPublicUrl: (bucket, path) => {
+    try {
+      const { data } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(path)
+      return data.publicUrl
+    } catch (error) {
+      console.error('Error obteniendo URL pública:', error)
+      return null
+    }
+  },
+
+  // Eliminar archivo
+  remove: async (bucket, paths) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .remove(paths)
+      return { data, error }
+    } catch (error) {
+      console.error('Error eliminando archivo:', error)
+      return { data: null, error }
+    }
+  }
+}
 
 // ==================== UTILIDADES ====================
 
 export const utils = {
-  // Verificar si tenemos configuración válida
-  hasValidConfig: () => hasConfig,
-  
-  // Verificar si estamos en modo demo
-  isDemoMode: () => !hasConfig,
-  
   // Formatear error de Supabase
   formatError: (error) => {
     if (!error) return null
     
-    const errorMap = {
-      'PGRST116': 'No se encontraron resultados',
-      '23505': 'Ya existe un registro con estos datos',
-      '23503': 'No se puede eliminar: existen registros relacionados',
-      '42501': 'Permisos insuficientes para esta operación',
-      '42P01': 'La tabla no existe en la base de datos'
+    // Errores comunes de Supabase
+    if (error.code === 'PGRST116') {
+      return 'No se encontraron resultados'
+    }
+    if (error.code === '23505') {
+      return 'Ya existe un registro con estos datos'
+    }
+    if (error.code === '23503') {
+      return 'No se puede eliminar: existen registros relacionados'
     }
     
-    return errorMap[error.code] || error.message || 'Error desconocido'
+    return error.message || 'Error desconocido'
   },
 
   // Verificar conexión
   testConnection: async () => {
-    if (!hasConfig) {
-      console.log('📄 Modo demostración - no hay configuración de Supabase')
-      return false
-    }
-
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .select('count', { count: 'exact', head: true })
+        .select('count')
+        .limit(1)
       
       if (error) {
-        console.error('❌ Error de conexión con Supabase:', error.message)
+        console.error('❌ Error de conexión con Supabase:', error)
         return false
       }
       
       console.log('✅ Conexión con Supabase exitosa')
       return true
     } catch (error) {
-      console.error('❌ Error verificando conexión:', error.message)
+      console.error('❌ Error verificando conexión:', error)
       return false
     }
   },
 
-  // Obtener información del entorno
-  getEnvInfo: () => ({
-    hasConfig,
-    url: supabaseUrl,
-    hasAnonKey: !!supabaseAnonKey,
-    mode: import.meta.env.MODE,
-    dev: import.meta.env.DEV
-  })
-}
-
-// ==================== TIEMPO REAL ====================
-
-export const realtime = {
-  // Suscribirse a cambios (solo si tenemos configuración válida)
-  subscribeToRooms: (callback) => {
-    if (!hasConfig) {
-      console.log('📄 Realtime no disponible en modo demo')
-      return null
-    }
+  // Log de configuración
+  logConfig: () => {
+    console.log('🔧 Configuración de Supabase:')
+    console.log('URL:', supabaseUrl ? '✅ Configurada' : '❌ No configurada')
+    console.log('Anon Key:', supabaseAnonKey ? '✅ Configurada' : '❌ No configurada')
     
-    try {
-      return supabase
-        .channel('rooms_changes')
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'rooms' },
-          callback
-        )
-        .subscribe()
-    } catch (error) {
-      console.warn('Error setting up rooms subscription:', error)
-      return null
-    }
-  },
-
-  subscribeToOrders: (callback) => {
-    if (!hasConfig) {
-      console.log('📄 Realtime no disponible en modo demo')
-      return null
-    }
-    
-    try {
-      return supabase
-        .channel('orders_changes')
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'orders' },
-          callback
-        )
-        .subscribe()
-    } catch (error) {
-      console.warn('Error setting up orders subscription:', error)
-      return null
-    }
-  },
-
-  unsubscribe: (channel) => {
-    try {
-      if (channel) {
-        return supabase.removeChannel(channel)
-      }
-    } catch (error) {
-      console.warn('Error unsubscribing:', error)
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.log('\n💡 Para configurar Supabase:')
+      console.log('1. Crea un archivo .env en la raíz del proyecto')
+      console.log('2. Agrega las siguientes líneas:')
+      console.log('   REACT_APP_SUPABASE_URL=tu_url_de_supabase')
+      console.log('   REACT_APP_SUPABASE_ANON_KEY=tu_anon_key')
+      console.log('3. Reinicia el servidor de desarrollo')
     }
   }
 }
 
-// Test de conexión al cargar (solo en desarrollo)
-if (isDevelopment && hasConfig) {
-  setTimeout(() => {
-    utils.testConnection()
-  }, 1000)
+// Verificar configuración al importar
+if (process.env.NODE_ENV === 'development') {
+  utils.logConfig()
+  utils.testConnection()
 }
 
-// Exportaciones para compatibilidad
-export { supabase as default }
-export { services as snacks }
+// Exportar cliente principal
+export default supabase
