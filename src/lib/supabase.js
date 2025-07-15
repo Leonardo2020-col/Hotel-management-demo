@@ -30,7 +30,65 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
-// Funciones helper para operaciones comunes
+// ==================== FUNCIONES FALTANTES ====================
+
+// Función para verificar autenticación actual (REQUERIDA POR HOOKS)
+export const checkAuth = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) {
+      console.error('Error checking auth:', error)
+      return { success: false, session: null, error }
+    }
+    
+    return { success: !!session, session, error: null }
+  } catch (error) {
+    console.error('Error in checkAuth:', error)
+    return { success: false, session: null, error }
+  }
+}
+
+// Función para manejar errores de autenticación (REQUERIDA POR HOOKS)
+export const handleAuthError = (error) => {
+  if (!error) return null
+  
+  // Manejar errores específicos de autenticación
+  switch (error.message) {
+    case 'Invalid login credentials':
+      return 'Credenciales de acceso inválidas'
+    case 'Email not confirmed':
+      return 'Email no confirmado'
+    case 'Too many requests':
+      return 'Demasiados intentos, intenta más tarde'
+    case 'User not found':
+      return 'Usuario no encontrado'
+    case 'Invalid email':
+      return 'Email inválido'
+    case 'Password should be at least 6 characters':
+      return 'La contraseña debe tener al menos 6 caracteres'
+    default:
+      return error.message || 'Error de autenticación'
+  }
+}
+
+// Función para consultas seguras (REQUERIDA POR HOOKS)
+export const safeQuery = async (queryFn) => {
+  try {
+    const result = await queryFn()
+    return { data: result.data, error: result.error }
+  } catch (error) {
+    console.error('Error in safeQuery:', error)
+    return { data: null, error }
+  }
+}
+
+// Función para generar código de confirmación único
+export const generateConfirmationCode = () => {
+  const year = new Date().getFullYear()
+  const randomStr = Math.random().toString(36).substr(2, 6).toUpperCase()
+  return `HTP-${year}-${randomStr}`
+}
 
 // ==================== AUTENTICACIÓN ====================
 
@@ -165,10 +223,11 @@ export const orders = {
         .from('orders')
         .select(`
           *,
-          order_snacks (
+          order_services (
             quantity,
-            price,
-            snacks (id, name, price)
+            unit_price,
+            total_price,
+            services (id, name, price)
           )
         `)
         .eq('status', 'active')
@@ -214,54 +273,58 @@ export const orders = {
   }
 }
 
-// ==================== SNACKS/PRODUCTOS ====================
+// ==================== SERVICIOS/SNACKS ====================
 
-export const snacks = {
-  // Obtener todos los snacks
+export const services = {
+  // Obtener todos los servicios
   getAll: async () => {
     try {
       const { data, error } = await supabase
-        .from('snacks')
+        .from('services')
         .select('*')
         .eq('available', true)
         .order('name')
       return { data, error }
     } catch (error) {
-      console.error('Error obteniendo snacks:', error)
+      console.error('Error obteniendo servicios:', error)
       return { data: null, error }
     }
   },
 
-  // Obtener tipos de snacks
+  // Obtener tipos de servicios
   getTypes: async () => {
     try {
       const { data, error } = await supabase
-        .from('snack_types')
+        .from('service_types')
         .select('*')
+        .eq('active', true)
         .order('name')
       return { data, error }
     } catch (error) {
-      console.error('Error obteniendo tipos de snacks:', error)
+      console.error('Error obteniendo tipos de servicios:', error)
       return { data: null, error }
     }
   },
 
-  // Obtener snacks por tipo
+  // Obtener servicios por tipo
   getByType: async (typeId) => {
     try {
       const { data, error } = await supabase
-        .from('snacks')
+        .from('services')
         .select('*')
         .eq('type_id', typeId)
         .eq('available', true)
         .order('name')
       return { data, error }
     } catch (error) {
-      console.error('Error obteniendo snacks por tipo:', error)
+      console.error('Error obteniendo servicios por tipo:', error)
       return { data: null, error }
     }
   }
 }
+
+// Mantener compatibilidad con snacks (alias para services)
+export const snacks = services
 
 // ==================== HUÉSPEDES ====================
 
@@ -305,6 +368,43 @@ export const guests = {
       return { data, error }
     } catch (error) {
       console.error('Error buscando huésped:', error)
+      return { data: null, error }
+    }
+  }
+}
+
+// ==================== INVENTARIO ====================
+
+export const inventory = {
+  // Obtener todo el inventario
+  getAll: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('status', 'active')
+        .order('name')
+      return { data, error }
+    } catch (error) {
+      console.error('Error obteniendo inventario:', error)
+      return { data: null, error }
+    }
+  },
+
+  // Actualizar stock
+  updateStock: async (itemId, newStock) => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .update({ 
+          current_stock: newStock,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', itemId)
+        .select()
+      return { data, error }
+    } catch (error) {
+      console.error('Error actualizando stock:', error)
       return { data: null, error }
     }
   }
