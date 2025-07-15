@@ -12,6 +12,73 @@ export const useCheckInData = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Al inicio del hook, agregar fallback inmediato
+useEffect(() => {
+  const initializeData = async () => {
+    setLoading(true);
+    
+    try {
+      // Intentar cargar desde Supabase
+      await Promise.all([
+        loadRooms(),
+        loadSnackTypes(), 
+        loadSnackItems(),
+        loadActiveOrders()
+      ]);
+    } catch (error) {
+      console.error('Error loading from Supabase, using fallback data:', error);
+      // Usar datos de fallback inmediatamente
+      const fallbackData = getFallbackData();
+      setFloorRooms(fallbackData.rooms);
+      setSnackTypes(fallbackData.types);
+      setSnackItems(fallbackData.items);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  initializeData();
+}, []);
+
+// Función para datos de fallback
+const getFallbackData = () => ({
+  rooms: {
+    1: Array.from({length: 12}, (_, i) => ({ 
+      number: 101 + i, 
+      status: 'available',
+      type: 'standard',
+      price: 80.00
+    })),
+    2: Array.from({length: 12}, (_, i) => ({ 
+      number: 201 + i, 
+      status: 'available',
+      type: 'deluxe', 
+      price: 95.00
+    })),
+    3: Array.from({length: 12}, (_, i) => ({ 
+      number: 301 + i, 
+      status: 'available',
+      type: 'suite',
+      price: 110.00
+    }))
+  },
+  types: [
+    { id: 'frutas', name: 'FRUTAS' },
+    { id: 'bebidas', name: 'BEBIDAS' },
+    { id: 'snacks', name: 'SNACKS' }
+  ],
+  items: {
+    frutas: [
+      { id: 1, name: 'Manzana', price: 2.50 },
+      { id: 2, name: 'Plátano', price: 1.50 }
+    ],
+    bebidas: [
+      { id: 3, name: 'Agua', price: 1.00 },
+      { id: 4, name: 'Coca Cola', price: 2.50 }
+    ]
+  }
+});
+
   // Cargar habitaciones desde Supabase con fallback robusto
   const loadRooms = async () => {
     try {
