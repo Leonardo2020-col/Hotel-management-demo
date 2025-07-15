@@ -39,8 +39,8 @@ const Dashboard = () => {
     getRevenueTrend
   } = useDashboard();
 
-  const occupancyTrend = getOccupancyTrend();
-  const revenueTrend = getRevenueTrend();
+  const occupancyTrend = getOccupancyTrend ? getOccupancyTrend() : { trend: 'stable', change: '0%' };
+const revenueTrend = getRevenueTrend ? getRevenueTrend() : { trend: 'stable', change: '0%' };
 
   const handleQuickCheckIn = (checkInData) => {
     console.log('Check-in rápido:', checkInData);
