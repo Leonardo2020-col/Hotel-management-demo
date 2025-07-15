@@ -1,5 +1,5 @@
-// src/hooks/useCheckInData.js - CORREGIDO PARA REACT
-import { useState, useEffect } from 'react';
+// src/hooks/useCheckInData.js - VERSIÓN CORREGIDA COMPLETA
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, safeQuery, handleAuthError } from '../lib/supabase';
 
 export const useCheckInData = () => {
@@ -12,75 +12,75 @@ export const useCheckInData = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Al inicio del hook, agregar fallback inmediato
-useEffect(() => {
-  const initializeData = async () => {
-    setLoading(true);
-    
-    try {
-      // Intentar cargar desde Supabase
-      await Promise.all([
-        loadRooms(),
-        loadSnackTypes(), 
-        loadSnackItems(),
-        loadActiveOrders()
-      ]);
-    } catch (error) {
-      console.error('Error loading from Supabase, using fallback data:', error);
-      // Usar datos de fallback inmediatamente
-      const fallbackData = getFallbackData();
-      setFloorRooms(fallbackData.rooms);
-      setSnackTypes(fallbackData.types);
-      setSnackItems(fallbackData.items);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  initializeData();
-}, []);
-
-// Función para datos de fallback
-const getFallbackData = () => ({
-  rooms: {
-    1: Array.from({length: 12}, (_, i) => ({ 
-      number: 101 + i, 
-      status: 'available',
-      type: 'standard',
-      price: 80.00
-    })),
-    2: Array.from({length: 12}, (_, i) => ({ 
-      number: 201 + i, 
-      status: 'available',
-      type: 'deluxe', 
-      price: 95.00
-    })),
-    3: Array.from({length: 12}, (_, i) => ({ 
-      number: 301 + i, 
-      status: 'available',
-      type: 'suite',
-      price: 110.00
-    }))
-  },
-  types: [
-    { id: 'frutas', name: 'FRUTAS' },
-    { id: 'bebidas', name: 'BEBIDAS' },
-    { id: 'snacks', name: 'SNACKS' }
-  ],
-  items: {
-    frutas: [
-      { id: 1, name: 'Manzana', price: 2.50 },
-      { id: 2, name: 'Plátano', price: 1.50 }
+  // FIX: Función para datos de fallback memoizada
+  const getFallbackData = useCallback(() => ({
+    rooms: {
+      1: Array.from({length: 12}, (_, i) => ({ 
+        number: 101 + i, 
+        status: i === 2 ? 'occupied' : i === 6 ? 'checkout' : 'available',
+        type: 'standard',
+        price: 80.00
+      })),
+      2: Array.from({length: 12}, (_, i) => ({ 
+        number: 201 + i, 
+        status: i === 1 || i === 8 ? 'occupied' : i === 4 ? 'checkout' : 'available',
+        type: 'deluxe', 
+        price: 95.00
+      })),
+      3: Array.from({length: 12}, (_, i) => ({ 
+        number: 301 + i, 
+        status: i === 3 ? 'occupied' : i === 5 ? 'checkout' : 'available',
+        type: 'suite',
+        price: 110.00
+      }))
+    },
+    types: [
+      { id: 'frutas', name: 'FRUTAS', description: 'Frutas frescas y naturales' },
+      { id: 'bebidas', name: 'BEBIDAS', description: 'Bebidas frías y calientes' },
+      { id: 'snacks', name: 'SNACKS', description: 'Bocadillos y aperitivos' },
+      { id: 'postres', name: 'POSTRES', description: 'Dulces y postres' }
     ],
-    bebidas: [
-      { id: 3, name: 'Agua', price: 1.00 },
-      { id: 4, name: 'Coca Cola', price: 2.50 }
-    ]
-  }
-});
+    items: {
+      frutas: [
+        { id: 1, name: 'Manzana', price: 2.50, stock: 50, description: 'Manzana roja fresca' },
+        { id: 2, name: 'Plátano', price: 1.50, stock: 30, description: 'Plátano maduro' },
+        { id: 3, name: 'Naranja', price: 2.00, stock: 40, description: 'Naranja jugosa' },
+        { id: 4, name: 'Uvas', price: 4.00, stock: 25, description: 'Uvas verdes sin pepas' }
+      ],
+      bebidas: [
+        { id: 6, name: 'Agua', price: 1.00, stock: 100, description: 'Agua mineral 500ml' },
+        { id: 7, name: 'Coca Cola', price: 2.50, stock: 80, description: 'Gaseosa 350ml' },
+        { id: 8, name: 'Jugo de naranja', price: 3.00, stock: 60, description: 'Jugo natural 300ml' },
+        { id: 9, name: 'Café', price: 2.00, stock: 45, description: 'Café instantáneo' }
+      ],
+      snacks: [
+        { id: 11, name: 'Papas fritas', price: 3.50, stock: 40, description: 'Papas fritas clásicas' },
+        { id: 12, name: 'Galletas', price: 2.00, stock: 35, description: 'Galletas de chocolate' },
+        { id: 13, name: 'Nueces', price: 4.50, stock: 30, description: 'Mix de nueces' },
+        { id: 14, name: 'Chocolate', price: 3.00, stock: 25, description: 'Chocolate premium' }
+      ],
+      postres: [
+        { id: 16, name: 'Helado', price: 4.00, stock: 30, description: 'Helado de vainilla' },
+        { id: 17, name: 'Torta', price: 5.50, stock: 18, description: 'Porción de torta' },
+        { id: 18, name: 'Flan', price: 3.50, stock: 22, description: 'Flan de caramelo' },
+        { id: 19, name: 'Brownie', price: 4.50, stock: 20, description: 'Brownie con nueces' }
+      ]
+    }
+  }), []);
 
-  // Cargar habitaciones desde Supabase con fallback robusto
-  const loadRooms = async () => {
+  // FIX: Fallback para habitaciones memoizada
+  const getFallbackRooms = useCallback(() => {
+    const fallbackData = getFallbackData();
+    const fallbackRooms = fallbackData.rooms;
+    const fallbackPrices = { 1: 80.00, 2: 95.00, 3: 110.00 };
+    
+    setFloorRooms(fallbackRooms);
+    setRoomPrices(fallbackPrices);
+    return { grouped: fallbackRooms, prices: fallbackPrices };
+  }, [getFallbackData]);
+
+  // FIX: Cargar habitaciones desde Supabase con fallback robusto - MEMOIZADA
+  const loadRooms = useCallback(async () => {
     try {
       const result = await safeQuery(async () => {
         const { data, error } = await supabase
@@ -127,39 +127,18 @@ const getFallbackData = () => ({
       setError(error.message);
       return getFallbackRooms();
     }
-  };
+  }, [getFallbackRooms]);
 
-  // Fallback para habitaciones cuando Supabase no está disponible
-  const getFallbackRooms = () => {
-    const fallbackRooms = {
-      1: Array.from({length: 12}, (_, i) => ({ 
-        number: 101 + i, 
-        status: i === 2 ? 'occupied' : i === 6 ? 'checkout' : 'available',
-        type: 'standard',
-        price: 80.00
-      })),
-      2: Array.from({length: 12}, (_, i) => ({ 
-        number: 201 + i, 
-        status: i === 1 || i === 8 ? 'occupied' : i === 4 ? 'checkout' : 'available',
-        type: 'deluxe', 
-        price: 95.00
-      })),
-      3: Array.from({length: 12}, (_, i) => ({ 
-        number: 301 + i, 
-        status: i === 3 ? 'occupied' : i === 5 ? 'checkout' : 'available',
-        type: 'suite',
-        price: 110.00
-      }))
-    };
-    const fallbackPrices = { 1: 80.00, 2: 95.00, 3: 110.00 };
-    
-    setFloorRooms(fallbackRooms);
-    setRoomPrices(fallbackPrices);
-    return { grouped: fallbackRooms, prices: fallbackPrices };
-  };
+  // FIX: Fallback para tipos de snacks memoizada
+  const getFallbackSnackTypes = useCallback(() => {
+    const fallbackData = getFallbackData();
+    const fallbackTypes = fallbackData.types;
+    setSnackTypes(fallbackTypes);
+    return fallbackTypes;
+  }, [getFallbackData]);
 
-  // Cargar tipos de servicios desde Supabase con fallback
-  const loadSnackTypes = async () => {
+  // FIX: Cargar tipos de servicios desde Supabase con fallback - MEMOIZADA
+  const loadSnackTypes = useCallback(async () => {
     try {
       const result = await safeQuery(async () => {
         const { data, error } = await supabase
@@ -190,22 +169,18 @@ const getFallbackData = () => ({
       setError(error.message);
       return getFallbackSnackTypes();
     }
-  };
+  }, [getFallbackSnackTypes]);
 
-  // Fallback para tipos de snacks
-  const getFallbackSnackTypes = () => {
-    const fallbackTypes = [
-      { id: 'frutas', name: 'FRUTAS', description: 'Frutas frescas y naturales' },
-      { id: 'bebidas', name: 'BEBIDAS', description: 'Bebidas frías y calientes' },
-      { id: 'snacks', name: 'SNACKS', description: 'Bocadillos y aperitivos' },
-      { id: 'postres', name: 'POSTRES', description: 'Dulces y postres' }
-    ];
-    setSnackTypes(fallbackTypes);
-    return fallbackTypes;
-  };
+  // FIX: Fallback para items de snacks memoizada
+  const getFallbackSnackItems = useCallback(() => {
+    const fallbackData = getFallbackData();
+    const fallbackItems = fallbackData.items;
+    setSnackItems(fallbackItems);
+    return fallbackItems;
+  }, [getFallbackData]);
 
-  // Cargar servicios/snacks desde Supabase con fallback
-  const loadSnackItems = async () => {
+  // FIX: Cargar servicios/snacks desde Supabase con fallback - MEMOIZADA
+  const loadSnackItems = useCallback(async () => {
     try {
       const result = await safeQuery(async () => {
         const { data, error } = await supabase
@@ -257,42 +232,10 @@ const getFallbackData = () => ({
       setError(error.message);
       return getFallbackSnackItems();
     }
-  };
+  }, [getFallbackSnackItems]);
 
-  // Fallback para items de snacks
-  const getFallbackSnackItems = () => {
-    const fallbackItems = {
-      frutas: [
-        { id: 1, name: 'Manzana', price: 2.50, stock: 50, description: 'Manzana roja fresca' },
-        { id: 2, name: 'Plátano', price: 1.50, stock: 30, description: 'Plátano maduro' },
-        { id: 3, name: 'Naranja', price: 2.00, stock: 40, description: 'Naranja jugosa' },
-        { id: 4, name: 'Uvas', price: 4.00, stock: 25, description: 'Uvas verdes sin pepas' }
-      ],
-      bebidas: [
-        { id: 6, name: 'Agua', price: 1.00, stock: 100, description: 'Agua mineral 500ml' },
-        { id: 7, name: 'Coca Cola', price: 2.50, stock: 80, description: 'Gaseosa 350ml' },
-        { id: 8, name: 'Jugo de naranja', price: 3.00, stock: 60, description: 'Jugo natural 300ml' },
-        { id: 9, name: 'Café', price: 2.00, stock: 45, description: 'Café instantáneo' }
-      ],
-      snacks: [
-        { id: 11, name: 'Papas fritas', price: 3.50, stock: 40, description: 'Papas fritas clásicas' },
-        { id: 12, name: 'Galletas', price: 2.00, stock: 35, description: 'Galletas de chocolate' },
-        { id: 13, name: 'Nueces', price: 4.50, stock: 30, description: 'Mix de nueces' },
-        { id: 14, name: 'Chocolate', price: 3.00, stock: 25, description: 'Chocolate premium' }
-      ],
-      postres: [
-        { id: 16, name: 'Helado', price: 4.00, stock: 30, description: 'Helado de vainilla' },
-        { id: 17, name: 'Torta', price: 5.50, stock: 18, description: 'Porción de torta' },
-        { id: 18, name: 'Flan', price: 3.50, stock: 22, description: 'Flan de caramelo' },
-        { id: 19, name: 'Brownie', price: 4.50, stock: 20, description: 'Brownie con nueces' }
-      ]
-    };
-    setSnackItems(fallbackItems);
-    return fallbackItems;
-  };
-
-  // Cargar órdenes activas desde Supabase con fallback
-  const loadActiveOrders = async () => {
+  // FIX: Cargar órdenes activas desde Supabase con fallback - MEMOIZADA
+  const loadActiveOrders = useCallback(async () => {
     try {
       const result = await safeQuery(async () => {
         const { data, error } = await supabase
@@ -354,10 +297,10 @@ const getFallbackData = () => ({
       setSavedOrders({});
       return {};
     }
-  };
+  }, []);
 
-  // Función para crear nueva orden en Supabase con manejo robusto
-  const createOrder = async (orderData) => {
+  // FIX: Función para crear nueva orden en Supabase con manejo robusto - MEMOIZADA
+  const createOrder = useCallback(async (orderData) => {
     try {
       // Intentar obtener guest_id si existe el huésped
       let guestId = null;
@@ -462,10 +405,10 @@ const getFallbackData = () => ({
       console.error('Error creando orden:', error);
       return createLocalOrder(orderData);
     }
-  };
+  }, [loadActiveOrders, loadRooms, loadSnackItems]);
 
-  // Crear orden local cuando Supabase no está disponible
-  const createLocalOrder = (orderData) => {
+  // FIX: Crear orden local cuando Supabase no está disponible - MEMOIZADA
+  const createLocalOrder = useCallback((orderData) => {
     const localOrder = {
       id: Date.now(),
       room_number: orderData.room.number,
@@ -491,10 +434,10 @@ const getFallbackData = () => ({
     }));
 
     return { success: true, data: localOrder, local: true };
-  };
+  }, []);
 
-  // Función para actualizar stock de servicios con manejo robusto
-  const updateServiceStock = async (serviceId, quantityChange) => {
+  // FIX: Función para actualizar stock de servicios con manejo robusto - MEMOIZADA
+  const updateServiceStock = useCallback(async (serviceId, quantityChange) => {
     try {
       const serviceResult = await safeQuery(async () => {
         const { data, error } = await supabase
@@ -537,10 +480,10 @@ const getFallbackData = () => ({
       console.error('Error actualizando stock de servicio:', error);
       return { success: false, error: error.message };
     }
-  };
+  }, []);
 
-  // Función para completar checkout con manejo robusto
-  const completeCheckout = async (roomNumber, paymentMethod) => {
+  // FIX: Función para completar checkout con manejo robusto - MEMOIZADA
+  const completeCheckout = useCallback(async (roomNumber, paymentMethod) => {
     try {
       // Completar la orden
       const orderResult = await safeQuery(async () => {
@@ -587,10 +530,10 @@ const getFallbackData = () => ({
       console.error('Error completando checkout:', error);
       return completeLocalCheckout(roomNumber, paymentMethod);
     }
-  };
+  }, [loadActiveOrders, loadRooms]);
 
-  // Completar checkout local cuando Supabase no está disponible
-  const completeLocalCheckout = (roomNumber, paymentMethod) => {
+  // FIX: Completar checkout local cuando Supabase no está disponible - MEMOIZADA
+  const completeLocalCheckout = useCallback((roomNumber, paymentMethod) => {
     // Actualizar estado local
     setSavedOrders(prev => {
       const newOrders = { ...prev };
@@ -612,10 +555,10 @@ const getFallbackData = () => ({
     });
 
     return { success: true, local: true };
-  };
+  }, []);
 
-  // Función para verificar disponibilidad de stock
-  const checkStockAvailability = (serviceId, requestedQuantity) => {
+  // FIX: Función para verificar disponibilidad de stock - MEMOIZADA
+  const checkStockAvailability = useCallback((serviceId, requestedQuantity) => {
     for (const categoryItems of Object.values(snackItems)) {
       const item = categoryItems.find(item => item.id === serviceId);
       if (item) {
@@ -630,10 +573,10 @@ const getFallbackData = () => ({
     }
     // Si no se encuentra el item, asumir que está disponible (modo fallback)
     return { available: true, currentStock: 100, requested: requestedQuantity, shortfall: 0 };
-  };
+  }, [snackItems]);
 
-  // Función para obtener productos con stock bajo
-  const getLowStockItems = () => {
+  // FIX: Función para obtener productos con stock bajo - MEMOIZADA
+  const getLowStockItems = useCallback(() => {
     const lowStockItems = [];
     
     Object.values(snackItems).forEach(categoryItems => {
@@ -650,32 +593,47 @@ const getFallbackData = () => ({
     });
     
     return lowStockItems;
-  };
+  }, [snackItems]);
 
-  // Función para refrescar todos los datos
-  const refreshData = async () => {
+  // FIX: Función de inicialización memoizada
+  const initializeData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
       await Promise.all([
         loadRooms(),
-        loadSnackTypes(),
+        loadSnackTypes(), 
         loadSnackItems(),
         loadActiveOrders()
       ]);
     } catch (error) {
-      console.error('Error refrescando datos:', error);
+      console.error('Error loading from Supabase:', error);
       setError(error.message);
+      // Usar datos de fallback
+      const fallbackData = getFallbackData();
+      setFloorRooms(fallbackData.rooms);
+      setSnackTypes(fallbackData.types);
+      setSnackItems(fallbackData.items);
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadRooms, loadSnackTypes, loadSnackItems, loadActiveOrders, getFallbackData]);
+
+  // FIX: Función para refrescar todos los datos - MEMOIZADA
+  const refreshData = useCallback(async () => {
+    return initializeData();
+  }, [initializeData]);
 
   // Función para actualizar stock de inventario (alias para compatibilidad)
   const updateInventoryStock = updateServiceStock;
 
-  // Suscripción a cambios en tiempo real (con manejo de errores)
+  // FIX: useEffect con dependencias correctas
+  useEffect(() => {
+    initializeData();
+  }, [initializeData]);
+
+  // FIX: Suscripción a cambios en tiempo real (con manejo de errores y cleanup)
   useEffect(() => {
     let roomsChannel, servicesChannel, ordersChannel;
 
@@ -729,14 +687,10 @@ const getFallbackData = () => ({
         console.warn('Error cleaning up subscriptions:', cleanupError);
       }
     };
-  }, []);
+  }, [loadRooms, loadSnackItems, loadActiveOrders]);
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    refreshData();
-  }, []);
-
-  return {
+  // FIX: Retornar objeto memoizado para evitar re-renders innecesarios
+  return useMemo(() => ({
     // Datos principales
     floorRooms,
     snackTypes,
@@ -762,5 +716,23 @@ const getFallbackData = () => ({
     loadSnackTypes,
     loadSnackItems,
     loadActiveOrders
-  };
+  }), [
+    floorRooms,
+    snackTypes,
+    snackItems,
+    roomPrices,
+    savedOrders,
+    loading,
+    error,
+    createOrder,
+    completeCheckout,
+    updateInventoryStock,
+    checkStockAvailability,
+    getLowStockItems,
+    refreshData,
+    loadRooms,
+    loadSnackTypes,
+    loadSnackItems,
+    loadActiveOrders
+  ]);
 };

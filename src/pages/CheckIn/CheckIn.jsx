@@ -1,5 +1,5 @@
-// src/pages/CheckIn/CheckIn.jsx - CORREGIDO Y OPTIMIZADO
-import React, { useState } from 'react';
+// src/pages/CheckIn/CheckIn.jsx - CORREGIDO PARA EVITAR LOADING INFINITO
+import React, { useState, useEffect, useMemo } from 'react';
 import { LogIn, LogOut } from 'lucide-react';
 import Button from '../../components/common/Button';
 import RoomGrid from '../../components/checkin/RoomGrid';
@@ -35,11 +35,17 @@ const CheckIn = () => {
     updateInventoryStock
   } = useCheckInData();
 
-  // Estado para manejar habitaciones que necesitan limpieza
-  const [roomsNeedingCleaning, setRoomsNeedingCleaning] = useState(() => {
-    const cleaningRooms = new Set();
-    
+  // FIX: Estado para manejar habitaciones que necesitan limpieza - INICIALIZADO SIMPLE
+  const [roomsNeedingCleaning, setRoomsNeedingCleaning] = useState(new Set());
+
+  // Estado para habitaciones que han sido limpiadas (disponibles)
+  const [cleanedRooms, setCleanedRooms] = useState(new Set());
+
+  // FIX: useEffect para inicializar roomsNeedingCleaning cuando floorRooms esté disponible
+  useEffect(() => {
     if (floorRooms && typeof floorRooms === 'object') {
+      const cleaningRooms = new Set();
+      
       Object.values(floorRooms).forEach(floor => {
         if (Array.isArray(floor)) {
           floor.forEach(room => {
@@ -49,13 +55,19 @@ const CheckIn = () => {
           });
         }
       });
+      
+      // Solo actualizar si hay cambios
+      setRoomsNeedingCleaning(prev => {
+        const prevArray = Array.from(prev).sort();
+        const newArray = Array.from(cleaningRooms).sort();
+        
+        if (JSON.stringify(prevArray) !== JSON.stringify(newArray)) {
+          return cleaningRooms;
+        }
+        return prev;
+      });
     }
-    
-    return cleaningRooms;
-  });
-
-  // Estado para habitaciones que han sido limpiadas (disponibles)
-  const [cleanedRooms, setCleanedRooms] = useState(new Set());
+  }, [floorRooms]); // Solo depende de floorRooms
 
   // Función para mostrar notificaciones estilizadas
   const showNotification = (message, type = 'success') => {
@@ -63,29 +75,31 @@ const CheckIn = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // MODIFICADA: Función para determinar el estado real de la habitación
-  const getRoomActualStatus = (room) => {
-    if (!room) return 'available';
-    
-    if (cleanedRooms.has(room.number)) {
-      return 'available';
-    }
-    
-    if (roomsNeedingCleaning.has(room.number)) {
-      return 'cleaning';
-    }
-    
-    // NUEVO: Manejar estado 'checkout' de Supabase como 'cleaning'
-    if (room.status === 'checkout') {
-      return 'cleaning';
-    }
-    
-    if (savedOrders && savedOrders[room.number]) {
-      return 'occupied';
-    }
-    
-    return room.status || 'available';
-  };
+  // FIX: Memoizar función para determinar el estado real de la habitación
+  const getRoomActualStatus = useMemo(() => {
+    return (room) => {
+      if (!room) return 'available';
+      
+      if (cleanedRooms.has(room.number)) {
+        return 'available';
+      }
+      
+      if (roomsNeedingCleaning.has(room.number)) {
+        return 'cleaning';
+      }
+      
+      // Manejar estado 'checkout' de Supabase como 'cleaning'
+      if (room.status === 'checkout') {
+        return 'cleaning';
+      }
+      
+      if (savedOrders && savedOrders[room.number]) {
+        return 'occupied';
+      }
+      
+      return room.status || 'available';
+    };
+  }, [cleanedRooms, roomsNeedingCleaning, savedOrders]);
 
   // Handlers para RoomGrid
   const handleFloorChange = (floor) => {
@@ -123,7 +137,7 @@ const CheckIn = () => {
     }
   };
 
-  // MODIFICADA: Función para manejar limpieza completada
+  // Función para manejar limpieza completada
   const handleRoomCleaned = async (roomNumber) => {
     // Remover de habitaciones que necesitan limpieza
     setRoomsNeedingCleaning(prev => {
@@ -138,7 +152,7 @@ const CheckIn = () => {
       return newSet;
     });
     
-    // NUEVO: Actualizar estado en Supabase
+    // Actualizar estado en Supabase
     try {
       const { error } = await supabase
         .from('rooms')
@@ -242,7 +256,7 @@ const CheckIn = () => {
     }
   };
 
-  // CORREGIDO: Función única para confirmar check-in
+  // Función única para confirmar check-in
   const handleConfirmCheckIn = async () => {
     if (!currentOrder) return;
     
@@ -282,7 +296,7 @@ const CheckIn = () => {
     }
   };
 
-  // NUEVO: Función para proceder al pago en checkout
+  // Función para proceder al pago en checkout
   const handleProceedToPayment = () => {
     if (!currentOrder) return;
     
@@ -301,7 +315,7 @@ const CheckIn = () => {
     setOrderStep(2);
   };
 
-  // CORREGIDO: Función para procesar pago
+  // Función para procesar pago
   const handleProcessPayment = async (paymentMethod) => {
     if (!currentOrder) return;
     
@@ -339,8 +353,15 @@ const CheckIn = () => {
     setCheckoutMode(false);
   };
 
-  // Mostrar loading si los datos no están listos
-  if (dataLoading || !floorRooms || Object.keys(floorRooms).length === 0) {
+  // FIX: Agregar verificación adicional para evitar renders innecesarios
+  const hasValidData = useMemo(() => {
+    return floorRooms && 
+           typeof floorRooms === 'object' && 
+           Object.keys(floorRooms).length > 0;
+  }, [floorRooms]);
+
+  // FIX: Mostrar loading solo cuando realmente esté cargando
+  if (dataLoading || !hasValidData) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -351,6 +372,26 @@ const CheckIn = () => {
           {dataError && (
             <p className="text-red-600 text-sm mt-2">Error: {dataError}</p>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // FIX: Mostrar error específico si hay problemas
+  if (dataError) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+            <h3 className="text-lg font-medium text-red-800 mb-2">Error de Conexión</h3>
+            <p className="text-red-600 text-sm mb-4">{dataError}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
         </div>
       </div>
     );

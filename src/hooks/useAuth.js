@@ -1,5 +1,5 @@
-// src/hooks/useAuth.js - CORREGIDO PARA ERRORES 401
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+// src/hooks/useAuth.js - VERSIÓN CORREGIDA COMPLETA
+import { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
 import { supabase, handleAuthError, checkAuth } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -117,52 +117,10 @@ export const useAuth = () => {
   const [staff, setStaff] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [initialized, setInitialized] = useState(false);
 
-  // Verificar sesión al cargar
-  useEffect(() => {
-    const getSession = async () => {
-      try {
-        setLoading(true);
-        const authCheck = await checkAuth();
-        
-        if (authCheck.success && authCheck.session?.user) {
-          await loadUserData(authCheck.session.user);
-        } else {
-          // No hay sesión, crear usuario demo
-          await createDemoUser();
-        }
-      } catch (err) {
-        console.error('Error getting session:', err);
-        setError(err.message);
-        // En caso de error, crear usuario demo
-        await createDemoUser();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getSession();
-
-    // Suscribirse a cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event);
-        if (event === 'SIGNED_IN' && session?.user) {
-          await loadUserData(session.user);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setStaff(null);
-          await createDemoUser();
-        }
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Crear usuario demo para desarrollo
-  const createDemoUser = async () => {
+  // FIX: Crear usuario demo para desarrollo - MEMOIZADA
+  const createDemoUser = useCallback(async () => {
     try {
       const demoUser = {
         id: 'demo-user-id',
@@ -197,10 +155,10 @@ export const useAuth = () => {
     } catch (error) {
       console.error('Error creating demo user:', error);
     }
-  };
+  }, []);
 
-  // Cargar datos del usuario/empleado
-  const loadUserData = async (authUser) => {
+  // FIX: Cargar datos del usuario/empleado - MEMOIZADA
+  const loadUserData = useCallback(async (authUser) => {
     try {
       setUser(authUser);
 
@@ -295,9 +253,70 @@ export const useAuth = () => {
       console.error('Error loading user data:', err);
       setError(err.message);
     }
-  };
+  }, []);
 
-  // Iniciar sesión
+  // FIX: Función principal para obtener sesión - MEMOIZADA CON CONTROL DE EJECUCIÓN
+  const getSession = useCallback(async () => {
+    // Prevenir ejecución múltiple
+    if (initialized) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const authCheck = await checkAuth();
+      
+      if (authCheck.success && authCheck.session?.user) {
+        await loadUserData(authCheck.session.user);
+      } else {
+        // Solo crear usuario demo si no tenemos usuario
+        if (!user && !staff) {
+          await createDemoUser();
+        }
+      }
+    } catch (err) {
+      console.error('Error getting session:', err);
+      setError(err.message);
+      // Solo crear usuario demo si no tenemos usuario y no hay error de red
+      if (!user && !staff && !err.message.includes('fetch')) {
+        await createDemoUser();
+      }
+    } finally {
+      setLoading(false);
+      setInitialized(true);
+    }
+  }, [initialized, user, staff, loadUserData, createDemoUser]);
+
+  // FIX: Verificar sesión al cargar - CON CONTROL DE EJECUCIÓN
+  useEffect(() => {
+    // Solo ejecutar si no se ha inicializado
+    if (!initialized) {
+      getSession();
+    }
+
+    // Suscribirse a cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event);
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          await loadUserData(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setStaff(null);
+          // Solo crear usuario demo si no tenemos sesión
+          if (!session?.user) {
+            await createDemoUser();
+          }
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [initialized, getSession, loadUserData, createDemoUser]);
+
+  // FIX: Iniciar sesión - MEMOIZADA
   const signIn = useCallback(async (email, password) => {
     try {
       setLoading(true);
@@ -322,7 +341,7 @@ export const useAuth = () => {
     }
   }, []);
 
-  // Cerrar sesión
+  // FIX: Cerrar sesión - MEMOIZADA
   const signOut = useCallback(async () => {
     try {
       setLoading(true);
@@ -333,6 +352,7 @@ export const useAuth = () => {
 
       setUser(null);
       setStaff(null);
+      setInitialized(false); // Reset initialization flag
       toast.success('Sesión cerrada exitosamente');
     } catch (err) {
       console.error('Error signing out:', err);
@@ -343,7 +363,7 @@ export const useAuth = () => {
     }
   }, []);
 
-  // Registrar nuevo empleado (solo admins) - FUNCIÓN SIMPLIFICADA
+  // FIX: Registrar nuevo empleado - MEMOIZADA
   const registerStaff = useCallback(async (staffData) => {
     try {
       if (!hasPermission(PERMISSIONS.MANAGE_STAFF)) {
@@ -378,9 +398,9 @@ export const useAuth = () => {
       toast.error('Error al registrar empleado: ' + err.message);
       throw err;
     }
-  }, []);
+  }, [staff]); // Dependencia de staff para hasPermission
 
-  // Verificar permisos
+  // FIX: Verificar permisos - MEMOIZADA
   const hasPermission = useCallback((permission) => {
     if (!staff) return false;
     
@@ -398,17 +418,23 @@ export const useAuth = () => {
     return rolePermissions.includes(permission) || customPermissions.includes(permission);
   }, [staff]);
 
-  // Verificar múltiples permisos
+  // FIX: Verificar múltiples permisos - MEMOIZADA
   const hasAnyPermission = useCallback((permissions) => {
     return permissions.some(permission => hasPermission(permission));
   }, [hasPermission]);
 
-  // Verificar todos los permisos
+  // FIX: Verificar todos los permisos - MEMOIZADA
   const hasAllPermissions = useCallback((permissions) => {
     return permissions.every(permission => hasPermission(permission));
   }, [hasPermission]);
 
-  return {
+  // FIX: Verificar si tiene rol específico - MEMOIZADA
+  const hasRole = useCallback((role) => {
+    return staff?.role === role;
+  }, [staff?.role]);
+
+  // FIX: Retornar objeto memoizado para evitar re-renders innecesarios
+  return useMemo(() => ({
     // Estado
     user,
     staff,
@@ -425,6 +451,7 @@ export const useAuth = () => {
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    hasRole,
 
     // Utilidades
     loadUserData,
@@ -433,7 +460,20 @@ export const useAuth = () => {
     USER_ROLES,
     PERMISSIONS,
     ROLE_PERMISSIONS
-  };
+  }), [
+    user,
+    staff,
+    loading,
+    error,
+    signIn,
+    signOut,
+    registerStaff,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    hasRole,
+    loadUserData
+  ]);
 };
 
 // Proveedor de contexto

@@ -1,5 +1,5 @@
-// src/hooks/useDashboard.js - VERSIÓN CORREGIDA
-import { useState, useEffect, useMemo } from 'react';
+// src/hooks/useDashboard.js - VERSIÓN CORREGIDA COMPLETA
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 
 export const useDashboard = () => {
@@ -64,25 +64,25 @@ export const useDashboard = () => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Funciones que el Dashboard necesita - CRÍTICO
-  const getOccupancyTrend = () => {
+  // FIX: Funciones que el Dashboard necesita - MEMOIZADAS CORRECTAMENTE
+  const getOccupancyTrend = useCallback(() => {
     const rate = stats.occupancy || stats.rooms?.occupancyRate || 0;
     return {
       trend: rate > 75 ? 'up' : rate < 50 ? 'down' : 'stable',
       change: rate > 75 ? '+5%' : rate < 50 ? '-3%' : '0%'
     };
-  };
+  }, [stats.occupancy, stats.rooms?.occupancyRate]);
 
-  const getRevenueTrend = () => {
+  const getRevenueTrend = useCallback(() => {
     const growth = stats.revenue?.growth || 0;
     return {
       trend: growth > 0 ? 'up' : growth < 0 ? 'down' : 'stable',
       change: growth > 0 ? `+${growth}%` : growth < 0 ? `${growth}%` : '0%'
     };
-  };
+  }, [stats.revenue?.growth]);
 
-  // Función para cargar estadísticas con datos de fallback
-  const loadRoomStats = async () => {
+  // FIX: Función para cargar estadísticas con datos de fallback - MEMOIZADA
+  const loadRoomStats = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('rooms')
@@ -135,9 +135,10 @@ export const useDashboard = () => {
       maintenance: 2,
       occupancyRate: 78
     };
-  };
+  }, []);
 
-  const loadRevenueStats = async () => {
+  // FIX: Función para cargar estadísticas de ingresos - MEMOIZADA
+  const loadRevenueStats = useCallback(async () => {
     try {
       // Intentar cargar desde Supabase
       const today = new Date().toISOString().split('T')[0];
@@ -169,9 +170,53 @@ export const useDashboard = () => {
         growth: 12
       };
     }
-  };
+  }, []);
 
-  const refreshStats = async () => {
+  // FIX: Función para cargar datos de ejemplo - MEMOIZADA
+  const loadExampleData = useCallback(() => {
+    // Datos de ejemplo para otras secciones
+    setRecentActivity([
+      {
+        id: 1,
+        type: 'check-in',
+        message: 'Juan Pérez - Habitación 101',
+        timestamp: new Date().toISOString()
+      },
+      {
+        id: 2,
+        type: 'check-out',
+        message: 'María García - Habitación 205',
+        timestamp: new Date(Date.now() - 3600000).toISOString()
+      }
+    ]);
+
+    setUpcomingCheckIns([
+      {
+        id: 1,
+        guest: 'Carlos López',
+        room: '308',
+        time: '14:00',
+        status: 'confirmed'
+      }
+    ]);
+
+    setOccupancyData([
+      { date: '2025-01-10', occupancy: 75 },
+      { date: '2025-01-11', occupancy: 80 },
+      { date: '2025-01-12', occupancy: 78 },
+      { date: '2025-01-13', occupancy: 82 },
+      { date: '2025-01-14', occupancy: 78 }
+    ]);
+
+    setRevenueByCategory([
+      { category: 'Habitaciones', amount: 45000, percentage: 75 },
+      { category: 'Servicios', amount: 12000, percentage: 20 },
+      { category: 'Extras', amount: 3000, percentage: 5 }
+    ]);
+  }, []);
+
+  // FIX: Función principal para refrescar estadísticas - MEMOIZADA SIN DEPENDENCIAS
+  const refreshStats = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -197,61 +242,71 @@ export const useDashboard = () => {
         guestSatisfaction: 4.2
       }));
 
-      // Datos de ejemplo para otras secciones
-      setRecentActivity([
-        {
-          id: 1,
-          type: 'check-in',
-          message: 'Juan Pérez - Habitación 101',
-          timestamp: new Date().toISOString()
-        },
-        {
-          id: 2,
-          type: 'check-out',
-          message: 'María García - Habitación 205',
-          timestamp: new Date(Date.now() - 3600000).toISOString()
-        }
-      ]);
-
-      setUpcomingCheckIns([
-        {
-          id: 1,
-          guest: 'Carlos López',
-          room: '308',
-          time: '14:00',
-          status: 'confirmed'
-        }
-      ]);
-
-      setOccupancyData([
-        { date: '2025-01-10', occupancy: 75 },
-        { date: '2025-01-11', occupancy: 80 },
-        { date: '2025-01-12', occupancy: 78 },
-        { date: '2025-01-13', occupancy: 82 },
-        { date: '2025-01-14', occupancy: 78 }
-      ]);
-
-      setRevenueByCategory([
-        { category: 'Habitaciones', amount: 45000, percentage: 75 },
-        { category: 'Servicios', amount: 12000, percentage: 20 },
-        { category: 'Extras', amount: 3000, percentage: 5 }
-      ]);
+      // Cargar datos de ejemplo
+      loadExampleData();
 
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Error refrescando estadísticas:', err);
       setError(err.message);
+      
+      // En caso de error, establecer valores por defecto
+      setStats(prevStats => ({
+        ...prevStats,
+        occupancy: 78,
+        totalGuests: 45,
+        averageRate: 120,
+        checkInsToday: 12,
+        checkOutsToday: 8,
+        availableRooms: 22,
+        occupiedRooms: 78,
+        totalRooms: 100,
+        guestSatisfaction: 4.2
+      }));
+      
+      loadExampleData();
+      setLastUpdated(new Date());
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // SIN DEPENDENCIAS para evitar bucles infinitos
 
-  // Cargar datos inicialmente
-  useEffect(() => {
-    refreshStats();
+  // FIX: Funciones adicionales de carga memoizadas
+  const loadOrderStats = useCallback(async () => {
+    return { active: 0, completed: 0, totalToday: 0, pending: 0 };
   }, []);
 
-  return {
+  const loadInventoryStats = useCallback(async () => {
+    return { totalItems: 0, totalValue: 0, lowStock: 0, outOfStock: 0 };
+  }, []);
+
+  const loadGuestStats = useCallback(async () => {
+    return { checkedIn: 0, checkingOut: 0, total: 0, newToday: 0 };
+  }, []);
+
+  const loadCleaningStats = useCallback(async () => {
+    return { pending: 0, inProgress: 0, completed: 0 };
+  }, []);
+
+  const loadRecentActivity = useCallback(async () => {
+    return [];
+  }, []);
+
+  const loadLowStockItems = useCallback(async () => {
+    return [];
+  }, []);
+
+  const loadUpcomingCheckOuts = useCallback(async () => {
+    return [];
+  }, []);
+
+  // FIX: Cargar datos inicialmente - solo una vez
+  useEffect(() => {
+    refreshStats();
+  }, []); // Solo ejecutar una vez al montar
+
+  // FIX: Retornar objeto memoizado para evitar re-renders innecesarios
+  return useMemo(() => ({
     // Datos principales
     stats,
     recentActivity,
@@ -266,7 +321,7 @@ export const useDashboard = () => {
     error,
     lastUpdated,
     
-    // Funciones REQUERIDAS por Dashboard - ESTO ES LO CRÍTICO
+    // Funciones REQUERIDAS por Dashboard - MEMOIZADAS
     refreshStats,
     getOccupancyTrend,
     getRevenueTrend,
@@ -274,12 +329,35 @@ export const useDashboard = () => {
     // Funciones adicionales de carga
     loadRoomStats,
     loadRevenueStats,
-    loadOrderStats: async () => ({ active: 0, completed: 0, totalToday: 0, pending: 0 }),
-    loadInventoryStats: async () => ({ totalItems: 0, totalValue: 0, lowStock: 0, outOfStock: 0 }),
-    loadGuestStats: async () => ({ checkedIn: 0, checkingOut: 0, total: 0, newToday: 0 }),
-    loadCleaningStats: async () => ({ pending: 0, inProgress: 0, completed: 0 }),
-    loadRecentActivity: async () => [],
-    loadLowStockItems: async () => [],
-    loadUpcomingCheckOuts: async () => []
-  };
+    loadOrderStats,
+    loadInventoryStats,
+    loadGuestStats,
+    loadCleaningStats,
+    loadRecentActivity,
+    loadLowStockItems,
+    loadUpcomingCheckOuts
+  }), [
+    stats,
+    recentActivity,
+    lowStockItems,
+    upcomingCheckOuts,
+    upcomingCheckIns,
+    occupancyData,
+    revenueByCategory,
+    loading,
+    error,
+    lastUpdated,
+    refreshStats,
+    getOccupancyTrend,
+    getRevenueTrend,
+    loadRoomStats,
+    loadRevenueStats,
+    loadOrderStats,
+    loadInventoryStats,
+    loadGuestStats,
+    loadCleaningStats,
+    loadRecentActivity,
+    loadLowStockItems,
+    loadUpcomingCheckOuts
+  ]);
 };
