@@ -1,6 +1,6 @@
 {
   "short_name": "Hotel Paraíso",
-  "name": "Hotel Paraíso - Sistema de Gestión",
+  "name": "Hotel Paraíso - Sistema de Gestión", 
   "icons": [
     {
       "src": "favicon.ico",
@@ -11,6 +11,5 @@
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#2563eb",
-  "background_color": "#ffffff",
-  "description": "Sistema de gestión hotelera para Hotel Paraíso"
+  "background_color": "#ffffff"
 }
